@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OCR確認・訂正画面</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      background-color: #f5f5f5;
+      color: #333;
+      line-height: 1.5;
+    }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    /* ヘッダー */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #1a237e 0%, #283593 100%);
+      color: white;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    .header-left h1 {
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    .document-info {
+      display: flex;
+      gap: 16px;
+      font-size: 13px;
+      margin-top: 4px;
+      opacity: 0.9;
+    }
+
+    .document-type {
+      background: rgba(255,255,255,0.2);
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    .stats {
+      display: flex;
+      gap: 24px;
+    }
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 4px 16px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 8px;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .stat-item.warning .stat-value { color: #ffca28; }
+    .stat-item.info .stat-value { color: #64b5f6; }
+
+    .stat-label {
+      font-size: 11px;
+      opacity: 0.8;
+    }
+
+    .header-right {
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn {
+      padding: 10px 24px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: #4caf50;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #43a047;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(76,175,80,0.4);
+    }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.2);
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255,255,255,0.3);
+    }
+
+    /* メインコンテンツ */
+    .main-content {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      gap: 16px;
+      padding: 16px;
+    }
+
+    .panel {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid #e0e0e0;
+      background: #fafafa;
+    }
+
+    .panel-header h2 {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .panel-hint {
+      font-size: 12px;
+      color: #888;
+    }
+
+    /* 画像パネル */
+    .image-panel {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .image-viewer {
+      flex: 1;
+      padding: 16px;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .image-container {
+      position: relative;
+      background: #f0f0f0;
+      border-radius: 8px;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.1);
+    }
+
+    .image-container svg.invoice-image {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .overlay-svg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .overlay-svg rect {
+      pointer-events: auto;
+      cursor: pointer;
+    }
+
+    .legend {
+      display: flex;
+      gap: 16px;
+      margin-top: 12px;
+      padding: 8px 16px;
+      background: #f5f5f5;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #666;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-color {
+      width: 16px;
+      height: 16px;
+      border-radius: 3px;
+    }
+
+    .legend-color.high {
+      background: rgba(76,175,80,0.3);
+      border: 2px solid #4caf50;
+    }
+
+    .legend-color.medium {
+      background: rgba(255,193,7,0.3);
+      border: 2px solid #ffc107;
+    }
+
+    .legend-color.low {
+      background: rgba(244,67,54,0.3);
+      border: 2px solid #f44336;
+    }
+
+    /* フィールドパネル */
+    .fields-panel {
+      width: 420px;
+      flex-shrink: 0;
+    }
+
+    .field-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+    }
+
+    .field-group {
+      margin-bottom: 20px;
+    }
+
+    .field-group-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #666;
+      margin-bottom: 8px;
+      padding-bottom: 4px;
+      border-bottom: 2px solid #e0e0e0;
+    }
+
+    .field-item {
+      padding: 12px;
+      margin-bottom: 8px;
+      border-radius: 8px;
+      border: 2px solid transparent;
+      background: #fafafa;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .field-item:hover {
+      background: #f0f0f0;
+      border-color: #e0e0e0;
+    }
+
+    .field-item.selected {
+      background: #e3f2fd;
+      border-color: #2196f3;
+    }
+
+    .field-item.edited {
+      background: #fff8e1;
+    }
+
+    .field-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .field-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #666;
+    }
+
+    .confidence-badge {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .confidence-high {
+      background: #e8f5e9;
+      color: #2e7d32;
+    }
+
+    .confidence-medium {
+      background: #fff8e1;
+      color: #f57f17;
+    }
+
+    .confidence-low {
+      background: #ffebee;
+      color: #c62828;
+    }
+
+    .field-value-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .field-value-input {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+      background: white;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .field-value-input:focus {
+      outline: none;
+      border-color: #2196f3;
+      box-shadow: 0 0 0 3px rgba(33,150,243,0.1);
+    }
+
+    .edited-indicator {
+      font-size: 10px;
+      padding: 2px 6px;
+      background: #ff9800;
+      color: white;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+
+    /* スクロールバー */
+    .field-list::-webkit-scrollbar,
+    .image-viewer::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .field-list::-webkit-scrollbar-track,
+    .image-viewer::-webkit-scrollbar-track {
+      background: #f0f0f0;
+      border-radius: 4px;
+    }
+
+    .field-list::-webkit-scrollbar-thumb,
+    .image-viewer::-webkit-scrollbar-thumb {
+      background: #ccc;
+      border-radius: 4px;
+    }
+
+    /* レスポンシブ */
+    @media (max-width: 1024px) {
+      .main-content {
+        flex-direction: column;
+      }
+      .fields-panel {
+        width: 100%;
+        max-height: 50vh;
+      }
+      .stats {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header-left">
+        <h1>OCR確認・訂正</h1>
+        <div class="document-info">
+          <span class="document-type">請求書</span>
+          <span>INV-2024-001234</span>
+          <span>処理日時: 2024/12/16 10:30</span>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat-item">
+          <span class="stat-value" id="total-count">22</span>
+          <span class="stat-label">項目数</span>
+        </div>
+        <div class="stat-item warning">
+          <span class="stat-value" id="warning-count">4</span>
+          <span class="stat-label">要確認</span>
+        </div>
+        <div class="stat-item info">
+          <span class="stat-value" id="edited-count">0</span>
+          <span class="stat-label">編集済</span>
+        </div>
+      </div>
+      <div class="header-right">
+        <button class="btn btn-secondary" onclick="resetAll()">リセット</button>
+        <button class="btn btn-primary" onclick="confirmData()">確定する</button>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <div class="panel image-panel">
+        <div class="panel-header">
+          <h2>原本画像</h2>
+        </div>
+        <div class="image-viewer">
+          <div class="image-container" id="image-container">
+            <!-- 請求書SVG -->
+            <svg class="invoice-image" viewBox="0 0 800 1100" xmlns="http://www.w3.org/2000/svg">
+              <rect width="800" height="1100" fill="#ffffff"/>
+              <text x="50" y="50" font-family="sans-serif" font-size="28" font-weight="bold" fill="#333">請求書</text>
+              <text x="50" y="100" font-family="sans-serif" font-size="18" fill="#333">株式会社サンプル商事</text>
+              <text x="50" y="125" font-family="sans-serif" font-size="12" fill="#666">〒100-0001 東京都千代田区千代田1-1</text>
+              <text x="50" y="145" font-family="sans-serif" font-size="12" fill="#666">TEL: 03-1234-5678 / FAX: 03-1234-5679</text>
+              <text x="550" y="100" font-family="sans-serif" font-size="14" fill="#333">請求書番号: INV-2024-001234</text>
+              <text x="550" y="140" font-family="sans-serif" font-size="14" fill="#333">請求日: 2024年12月15日</text>
+              <text x="550" y="180" font-family="sans-serif" font-size="14" fill="#333">支払期限: 2024年12月31日</text>
+              <text x="50" y="220" font-family="sans-serif" font-size="18" fill="#333">株式会社テスト工業 御中</text>
+              <text x="50" y="265" font-family="sans-serif" font-size="14" fill="#333">東京都千代田区丸の内1-1-1</text>
+              <rect x="40" y="310" width="720" height="35" fill="#f0f0f0" stroke="#ccc"/>
+              <text x="60" y="333" font-family="sans-serif" font-size="14" font-weight="bold" fill="#333">品目</text>
+              <text x="410" y="333" font-family="sans-serif" font-size="14" font-weight="bold" fill="#333">数量</text>
+              <text x="500" y="333" font-family="sans-serif" font-size="14" font-weight="bold" fill="#333">単価(円)</text>
+              <text x="640" y="333" font-family="sans-serif" font-size="14" font-weight="bold" fill="#333">金額(円)</text>
+              <rect x="40" y="345" width="720" height="35" fill="#fff" stroke="#ccc"/>
+              <text x="60" y="368" font-family="sans-serif" font-size="14" fill="#333">Webシステム開発費</text>
+              <text x="420" y="368" font-family="sans-serif" font-size="14" fill="#333">1</text>
+              <text x="500" y="368" font-family="sans-serif" font-size="14" fill="#333">500,000</text>
+              <text x="640" y="368" font-family="sans-serif" font-size="14" fill="#333">500,000</text>
+              <rect x="40" y="380" width="720" height="35" fill="#fff" stroke="#ccc"/>
+              <text x="60" y="403" font-family="sans-serif" font-size="14" fill="#333">月額保守費用</text>
+              <text x="420" y="403" font-family="sans-serif" font-size="14" fill="#333">12</text>
+              <text x="500" y="403" font-family="sans-serif" font-size="14" fill="#333">30,000</text>
+              <text x="640" y="403" font-family="sans-serif" font-size="14" fill="#333">360,000</text>
+              <rect x="40" y="415" width="720" height="35" fill="#fff" stroke="#ccc"/>
+              <rect x="40" y="450" width="720" height="35" fill="#fff" stroke="#ccc"/>
+              <rect x="450" y="500" width="310" height="30" fill="#fff" stroke="#ccc"/>
+              <text x="480" y="520" font-family="sans-serif" font-size="14" fill="#333">小計</text>
+              <text x="640" y="520" font-family="sans-serif" font-size="14" fill="#333">860,000</text>
+              <rect x="450" y="530" width="310" height="30" fill="#fff" stroke="#ccc"/>
+              <text x="480" y="550" font-family="sans-serif" font-size="14" fill="#333">消費税(10%)</text>
+              <text x="640" y="550" font-family="sans-serif" font-size="14" fill="#333">86,000</text>
+              <rect x="450" y="560" width="310" height="40" fill="#e8f4e8" stroke="#4CAF50"/>
+              <text x="480" y="588" font-family="sans-serif" font-size="18" font-weight="bold" fill="#333">合計金額</text>
+              <text x="620" y="588" font-family="sans-serif" font-size="18" font-weight="bold" fill="#333">¥946,000</text>
+              <text x="50" y="670" font-family="sans-serif" font-size="16" font-weight="bold" fill="#333">お振込先</text>
+              <rect x="40" y="680" width="400" height="200" fill="#fafafa" stroke="#ddd" rx="5"/>
+              <text x="60" y="720" font-family="sans-serif" font-size="14" fill="#333">銀行名: サンプル銀行</text>
+              <text x="60" y="760" font-family="sans-serif" font-size="14" fill="#333">支店名: 本店営業部</text>
+              <text x="60" y="800" font-family="sans-serif" font-size="14" fill="#333">口座種別: 普通  口座番号: 1234567</text>
+              <text x="60" y="840" font-family="sans-serif" font-size="14" fill="#333">口座名義: カ)サンプルショウジ</text>
+              <text x="50" y="920" font-family="sans-serif" font-size="12" fill="#666">※お振込手数料はお客様にてご負担ください。</text>
+              <text x="50" y="940" font-family="sans-serif" font-size="12" fill="#666">※お支払期限を過ぎますと、遅延損害金が発生する場合がございます。</text>
+              <circle cx="700" cy="100" r="40" fill="none" stroke="#c00" stroke-width="2" opacity="0.7"/>
+              <text x="700" y="100" font-family="sans-serif" font-size="10" fill="#c00" text-anchor="middle" opacity="0.7">サンプル</text>
+              <text x="700" y="115" font-family="sans-serif" font-size="10" fill="#c00" text-anchor="middle" opacity="0.7">商事</text>
+            </svg>
+            <!-- オーバーレイ -->
+            <svg class="overlay-svg" viewBox="0 0 800 1100" id="overlay-svg"></svg>
+          </div>
+          <div class="legend">
+            <span class="legend-item"><span class="legend-color high"></span>高信頼度 (90%以上)</span>
+            <span class="legend-item"><span class="legend-color medium"></span>中信頼度 (75-89%)</span>
+            <span class="legend-item"><span class="legend-color low"></span>低信頼度 (75%未満)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel fields-panel">
+        <div class="panel-header">
+          <h2>読取結果</h2>
+          <span class="panel-hint">クリックで位置確認・直接編集可</span>
+        </div>
+        <div class="field-list" id="field-list"></div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // OCRフィールドデータ
+    const ocrFields = [
+      { id: 'company_name', label: '会社名', value: '株式会社サンプル商事', confidence: 98, group: 'basic', box: { x: 50, y: 80, w: 250, h: 35 } },
+      { id: 'invoice_number', label: '請求書番号', value: 'INV-2024-001234', confidence: 95, group: 'basic', box: { x: 550, y: 80, w: 200, h: 30 } },
+      { id: 'invoice_date', label: '請求日', value: '2024年12月15日', confidence: 92, group: 'basic', box: { x: 550, y: 120, w: 180, h: 30 } },
+      { id: 'due_date', label: '支払期限', value: '2024年12月31日', confidence: 88, group: 'basic', box: { x: 550, y: 160, w: 180, h: 30 } },
+      { id: 'customer_name', label: '請求先', value: '株式会社テスト工業', confidence: 96, group: 'basic', box: { x: 50, y: 200, w: 250, h: 35 } },
+      { id: 'customer_address', label: '請求先住所', value: '東京都千代田区丸の内1-1-1', confidence: 72, group: 'basic', box: { x: 50, y: 245, w: 300, h: 30 } },
+      { id: 'item_1_name', label: '品目1', value: 'Webシステム開発費', confidence: 94, group: 'items', box: { x: 50, y: 350, w: 250, h: 30 } },
+      { id: 'item_1_qty', label: '数量1', value: '1', confidence: 99, group: 'items', box: { x: 400, y: 350, w: 60, h: 30 } },
+      { id: 'item_1_price', label: '単価1', value: '500,000', confidence: 91, group: 'items', box: { x: 480, y: 350, w: 120, h: 30 } },
+      { id: 'item_1_amount', label: '金額1', value: '500,000', confidence: 93, group: 'items', box: { x: 620, y: 350, w: 130, h: 30 } },
+      { id: 'item_2_name', label: '品目2', value: '月額保守費用', confidence: 89, group: 'items', box: { x: 50, y: 390, w: 200, h: 30 } },
+      { id: 'item_2_qty', label: '数量2', value: '12', confidence: 65, group: 'items', box: { x: 400, y: 390, w: 60, h: 30 } },
+      { id: 'item_2_price', label: '単価2', value: '30,000', confidence: 87, group: 'items', box: { x: 480, y: 390, w: 120, h: 30 } },
+      { id: 'item_2_amount', label: '金額2', value: '360,000', confidence: 85, group: 'items', box: { x: 620, y: 390, w: 130, h: 30 } },
+      { id: 'subtotal', label: '小計', value: '860,000', confidence: 97, group: 'totals', box: { x: 620, y: 500, w: 130, h: 30 } },
+      { id: 'tax', label: '消費税(10%)', value: '86,000', confidence: 94, group: 'totals', box: { x: 620, y: 540, w: 130, h: 30 } },
+      { id: 'total', label: '合計金額', value: '946,000', confidence: 98, group: 'totals', box: { x: 620, y: 570, w: 130, h: 40 } },
+      { id: 'bank_name', label: '振込先銀行', value: 'サンプル銀行', confidence: 78, group: 'bank', box: { x: 50, y: 700, w: 180, h: 30 } },
+      { id: 'branch_name', label: '支店名', value: '本店営業部', confidence: 82, group: 'bank', box: { x: 50, y: 740, w: 150, h: 30 } },
+      { id: 'account_type', label: '口座種別', value: '普通', confidence: 96, group: 'bank', box: { x: 50, y: 780, w: 80, h: 30 } },
+      { id: 'account_number', label: '口座番号', value: '1234567', confidence: 68, group: 'bank', box: { x: 150, y: 780, w: 120, h: 30 } },
+      { id: 'account_holder', label: '口座名義', value: 'カ)サンプルショウジ', confidence: 74, group: 'bank', box: { x: 50, y: 820, w: 220, h: 30 } },
+    ];
+
+    // 元データ保存
+    const originalValues = {};
+    ocrFields.forEach(f => originalValues[f.id] = f.value);
+
+    let selectedFieldId = null;
+
+    // グループ名
+    const groupNames = {
+      basic: '基本情報',
+      items: '明細',
+      totals: '金額',
+      bank: '振込先'
+    };
+
+    // 信頼度に応じた色
+    function getConfidenceClass(conf) {
+      if (conf >= 90) return 'high';
+      if (conf >= 75) return 'medium';
+      return 'low';
+    }
+
+    function getConfidenceIcon(conf) {
+      if (conf >= 90) return '✓';
+      if (conf >= 75) return '!';
+      return '✗';
+    }
+
+    function getBoxFill(conf, selected) {
+      if (selected) return 'rgba(33,150,243,0.4)';
+      if (conf >= 90) return 'rgba(76,175,80,0.3)';
+      if (conf >= 75) return 'rgba(255,193,7,0.3)';
+      return 'rgba(244,67,54,0.3)';
+    }
+
+    function getBoxStroke(conf, selected) {
+      if (selected) return '#2196f3';
+      if (conf >= 90) return '#4caf50';
+      if (conf >= 75) return '#ffc107';
+      return '#f44336';
+    }
+
+    // フィールド選択
+    function selectField(id) {
+      selectedFieldId = selectedFieldId === id ? null : id;
+      render();
+
+      // 選択したフィールドにスクロール
+      if (selectedFieldId) {
+        const el = document.getElementById('field-' + selectedFieldId);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+
+    // 値変更
+    function onValueChange(id, newValue) {
+      const field = ocrFields.find(f => f.id === id);
+      if (field) {
+        field.value = newValue;
+        field.edited = field.value !== originalValues[id];
+        updateStats();
+        renderOverlay();
+        // フィールドアイテムの編集状態を更新
+        const el = document.getElementById('field-' + id);
+        if (el) {
+          el.classList.toggle('edited', field.edited);
+          const indicator = el.querySelector('.edited-indicator');
+          if (field.edited && !indicator) {
+            const container = el.querySelector('.field-value-container');
+            const span = document.createElement('span');
+            span.className = 'edited-indicator';
+            span.textContent = '編集済';
+            container.appendChild(span);
+          } else if (!field.edited && indicator) {
+            indicator.remove();
+          }
+        }
+      }
+    }
+
+    // 統計更新
+    function updateStats() {
+      const warningCount = ocrFields.filter(f => f.confidence < 75).length;
+      const editedCount = ocrFields.filter(f => f.edited).length;
+      document.getElementById('total-count').textContent = ocrFields.length;
+      document.getElementById('warning-count').textContent = warningCount;
+      document.getElementById('edited-count').textContent = editedCount;
+    }
+
+    // オーバーレイ描画
+    function renderOverlay() {
+      const svg = document.getElementById('overlay-svg');
+      svg.innerHTML = '';
+
+      ocrFields.forEach(field => {
+        const isSelected = field.id === selectedFieldId;
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('x', field.box.x);
+        rect.setAttribute('y', field.box.y);
+        rect.setAttribute('width', field.box.w);
+        rect.setAttribute('height', field.box.h);
+        rect.setAttribute('fill', getBoxFill(field.confidence, isSelected));
+        rect.setAttribute('stroke', getBoxStroke(field.confidence, isSelected));
+        rect.setAttribute('stroke-width', isSelected ? 3 : 2);
+        rect.setAttribute('rx', 2);
+        rect.style.cursor = 'pointer';
+        rect.onclick = () => selectField(field.id);
+        svg.appendChild(rect);
+
+        if (isSelected) {
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          text.setAttribute('x', field.box.x);
+          text.setAttribute('y', field.box.y - 5);
+          text.setAttribute('fill', '#2196f3');
+          text.setAttribute('font-size', '12');
+          text.setAttribute('font-weight', 'bold');
+          text.textContent = field.label;
+          svg.appendChild(text);
+        }
+      });
+    }
+
+    // フィールドリスト描画
+    function renderFieldList() {
+      const container = document.getElementById('field-list');
+      container.innerHTML = '';
+
+      const groups = ['basic', 'items', 'totals', 'bank'];
+
+      groups.forEach(groupKey => {
+        const groupFields = ocrFields.filter(f => f.group === groupKey);
+        if (groupFields.length === 0) return;
+
+        const groupDiv = document.createElement('div');
+        groupDiv.className = 'field-group';
+
+        const title = document.createElement('h3');
+        title.className = 'field-group-title';
+        title.textContent = groupNames[groupKey];
+        groupDiv.appendChild(title);
+
+        groupFields.forEach(field => {
+          const isSelected = field.id === selectedFieldId;
+          const confClass = getConfidenceClass(field.confidence);
+
+          const item = document.createElement('div');
+          item.className = 'field-item' + (isSelected ? ' selected' : '') + (field.edited ? ' edited' : '');
+          item.id = 'field-' + field.id;
+          item.onclick = (e) => {
+            if (e.target.tagName !== 'INPUT') selectField(field.id);
+          };
+
+          item.innerHTML = `
+            <div class="field-header">
+              <span class="field-label">${field.label}</span>
+              <span class="confidence-badge confidence-${confClass}">
+                <span>${getConfidenceIcon(field.confidence)}</span>
+                ${field.confidence}%
+              </span>
+            </div>
+            <div class="field-value-container">
+              <input type="text" class="field-value-input" value="${field.value}"
+                     oninput="onValueChange('${field.id}', this.value)">
+              ${field.edited ? '<span class="edited-indicator">編集済</span>' : ''}
+            </div>
+          `;
+
+          groupDiv.appendChild(item);
+        });
+
+        container.appendChild(groupDiv);
+      });
+    }
+
+    // 全体描画
+    function render() {
+      renderOverlay();
+      renderFieldList();
+      updateStats();
+    }
+
+    // リセット
+    function resetAll() {
+      if (confirm('編集内容をリセットしますか？')) {
+        ocrFields.forEach(f => {
+          f.value = originalValues[f.id];
+          f.edited = false;
+        });
+        selectedFieldId = null;
+        render();
+      }
+    }
+
+    // 確定
+    function confirmData() {
+      const result = ocrFields.map(f => ({
+        id: f.id,
+        label: f.label,
+        value: f.value,
+        edited: f.edited || false
+      }));
+      console.log('確定データ:', result);
+      alert('データが確定されました。\n(コンソールに出力されました)\n\n編集済み項目: ' +
+            ocrFields.filter(f => f.edited).length + '件');
+    }
+
+    // 初期化
+    render();
+  </script>
+</body>
+</html>
