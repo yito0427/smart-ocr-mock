@@ -1,0 +1,2749 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ドキュメント管理システム</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    :root {
+      --bg-base: #fafafa;
+      --bg-white: #ffffff;
+      --bg-light: #f5f5f5;
+      --border-color: #e0e0e0;
+      --text-primary: #333333;
+      --text-secondary: #666666;
+      --teal: #008080;
+      --teal-light: #e0f2f1;
+      --teal-hover: #006666;
+      --mustard: #d4a017;
+      --mustard-light: #fff8e1;
+      --bengara: #8b2500;
+      --bengara-light: #ffebee;
+      --shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Segoe UI', 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      font-size: 14px;
+      line-height: 1.5;
+      overflow: hidden;
+    }
+
+    /* ローディングオーバーレイ */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255,255,255,0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+
+    .loading-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid var(--border-color);
+      border-top-color: var(--teal);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* トースト通知 */
+    .toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .toast {
+      padding: 12px 20px;
+      border-radius: 6px;
+      box-shadow: var(--shadow);
+      animation: slideIn 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 250px;
+    }
+
+    .toast.success {
+      background: var(--teal-light);
+      border-left: 4px solid var(--teal);
+    }
+
+    .toast.warning {
+      background: var(--mustard-light);
+      border-left: 4px solid var(--mustard);
+    }
+
+    .toast.error {
+      background: var(--bengara-light);
+      border-left: 4px solid var(--bengara);
+      color: var(--bengara);
+    }
+
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    /* アプリレイアウト */
+    .app {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ヘッダー */
+    .app-header {
+      background: var(--bg-white);
+      border-bottom: 1px solid var(--border-color);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: var(--shadow);
+      z-index: 100;
+    }
+
+    .app-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--teal);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 4px;
+    }
+
+    .nav-tab {
+      padding: 8px 20px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--text-secondary);
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+
+    .nav-tab:hover {
+      background: var(--bg-light);
+    }
+
+    .nav-tab.active {
+      background: var(--teal);
+      color: white;
+    }
+
+    /* メインコンテンツ */
+    .main-content {
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* 画面 */
+    .screen {
+      height: 100%;
+      display: none;
+    }
+
+    .screen.active {
+      display: flex;
+    }
+
+    /* ボタン */
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .btn-primary {
+      background: var(--teal);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: var(--teal-hover);
+    }
+
+    .btn-secondary {
+      background: var(--bg-light);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+      background: var(--border-color);
+    }
+
+    .btn-danger {
+      background: var(--bengara);
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #6b1d00;
+    }
+
+    .btn-icon {
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      background: var(--bg-light);
+      border: 1px solid var(--border-color);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-icon:hover {
+      background: var(--teal-light);
+      border-color: var(--teal);
+    }
+
+    .btn-icon.active {
+      background: var(--teal);
+      color: white;
+      border-color: var(--teal);
+    }
+
+    /* 入力フィールド */
+    .input-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .form-input {
+      padding: 8px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: var(--teal);
+      box-shadow: 0 0 0 3px var(--teal-light);
+    }
+
+    .form-input.error {
+      border-color: var(--bengara);
+      box-shadow: 0 0 0 3px var(--bengara-light);
+    }
+
+    /* ============================================
+       ドキュメント一覧画面
+       ============================================ */
+    .list-screen {
+      flex-direction: column;
+    }
+
+    .list-toolbar {
+      padding: 12px 16px;
+      background: var(--bg-white);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .search-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      max-width: 400px;
+    }
+
+    .search-box .form-input {
+      flex: 1;
+    }
+
+    .toolbar-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .list-container {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* テーブルエリア */
+    .table-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-width: 400px;
+    }
+
+    .table-wrapper {
+      flex: 1;
+      overflow: auto;
+      background: var(--bg-white);
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .data-table th,
+    .data-table td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+      white-space: nowrap;
+    }
+
+    .data-table th {
+      background: var(--bg-light);
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .data-table th:hover {
+      background: var(--border-color);
+    }
+
+    .data-table th .sort-icon {
+      margin-left: 4px;
+      opacity: 0.5;
+    }
+
+    .data-table th.sorted .sort-icon {
+      opacity: 1;
+      color: var(--teal);
+    }
+
+    .data-table tbody tr {
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .data-table tbody tr:hover {
+      background: var(--bg-light);
+    }
+
+    .data-table tbody tr.selected {
+      background: var(--teal-light);
+    }
+
+    .data-table tbody tr.selected:hover {
+      background: #b2dfdb;
+    }
+
+    .checkbox-cell {
+      width: 40px;
+      text-align: center;
+    }
+
+    /* リサイザー */
+    .resizer {
+      width: 6px;
+      background: var(--border-color);
+      cursor: col-resize;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+
+    .resizer:hover,
+    .resizer.dragging {
+      background: var(--teal);
+    }
+
+    /* プレビューエリア */
+    .preview-area {
+      width: 400px;
+      background: var(--bg-white);
+      border-left: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .preview-area.hidden {
+      display: none;
+    }
+
+    .preview-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-light);
+    }
+
+    .preview-header h3 {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .preview-content {
+      flex: 1;
+      padding: 16px;
+      overflow: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .preview-content canvas {
+      max-width: 100%;
+      max-height: 100%;
+      box-shadow: var(--shadow);
+    }
+
+    .preview-placeholder {
+      color: var(--text-secondary);
+      text-align: center;
+    }
+
+    /* ステータスバー */
+    .status-bar {
+      padding: 8px 16px;
+      background: var(--bg-light);
+      border-top: 1px solid var(--border-color);
+      font-size: 12px;
+      color: var(--text-secondary);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* ============================================
+       編集画面
+       ============================================ */
+    .edit-screen {
+      flex-direction: column;
+    }
+
+    .edit-header {
+      padding: 12px 16px;
+      background: var(--bg-white);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .edit-header h2 {
+      font-size: 16px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .edit-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .edit-body {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* 編集ツールバー */
+    .edit-toolbar {
+      width: 56px;
+      background: var(--bg-white);
+      border-right: 1px solid var(--border-color);
+      padding: 12px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .tool-btn {
+      width: 40px;
+      height: 40px;
+      border: none;
+      background: var(--bg-light);
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      font-size: 18px;
+    }
+
+    .tool-btn:hover {
+      background: var(--teal-light);
+    }
+
+    .tool-btn.active {
+      background: var(--teal);
+      color: white;
+    }
+
+    .tool-divider {
+      width: 32px;
+      height: 1px;
+      background: var(--border-color);
+      margin: 4px 0;
+    }
+
+    /* PDFプレビューエリア */
+    .pdf-preview-area {
+      flex: 1;
+      min-width: 300px;
+      background: #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .canvas-container {
+      flex: 1;
+      overflow: auto;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .canvas-wrapper {
+      position: relative;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    }
+
+    #pdfCanvas {
+      display: block;
+      background: white;
+    }
+
+    #drawCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      cursor: crosshair;
+    }
+
+    .pdf-controls {
+      padding: 8px 16px;
+      background: var(--bg-white);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    /* 属性編集エリア */
+    .attributes-area {
+      width: 450px;
+      background: var(--bg-white);
+      border-left: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .attributes-panel {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+    }
+
+    .attr-section {
+      margin-bottom: 24px;
+    }
+
+    .attr-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--teal);
+    }
+
+    .attr-section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--teal);
+    }
+
+    .attr-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 12px;
+      gap: 8px;
+    }
+
+    .attr-label {
+      width: 100px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      flex-shrink: 0;
+    }
+
+    .attr-label.required::after {
+      content: '*';
+      color: var(--bengara);
+      margin-left: 2px;
+    }
+
+    .attr-value {
+      flex: 1;
+      display: flex;
+      gap: 4px;
+    }
+
+    .attr-value .form-input {
+      flex: 1;
+    }
+
+    /* 明細テーブル */
+    .detail-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 250px;
+    }
+
+    .detail-table-wrapper {
+      flex: 1;
+      overflow: auto;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+    }
+
+    .detail-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .detail-table th,
+    .detail-table td {
+      padding: 8px 10px;
+      border: 1px solid var(--border-color);
+      position: relative;
+    }
+
+    .detail-table th {
+      background: var(--bg-light);
+      font-weight: 500;
+      white-space: nowrap;
+      cursor: grab;
+      user-select: none;
+    }
+
+    .detail-table th:active {
+      cursor: grabbing;
+    }
+
+    .detail-table th.drag-over {
+      background: var(--teal-light);
+      border-left: 3px solid var(--teal);
+    }
+
+    .detail-table td {
+      background: white;
+    }
+
+    .detail-table td input {
+      width: 100%;
+      border: none;
+      padding: 4px;
+      font-size: 13px;
+      font-family: inherit;
+      background: transparent;
+    }
+
+    .detail-table td input:focus {
+      outline: 2px solid var(--teal);
+      outline-offset: -2px;
+    }
+
+    .detail-table td.readonly {
+      background: var(--bg-light);
+    }
+
+    .detail-table td.selected {
+      background: var(--teal-light);
+    }
+
+    .detail-table td.alert {
+      background: var(--mustard-light);
+    }
+
+    .detail-table tr.drag-row {
+      opacity: 0.5;
+    }
+
+    .detail-table tr.drag-over-row td {
+      border-top: 3px solid var(--teal);
+    }
+
+    .row-actions {
+      width: 30px;
+      text-align: center;
+    }
+
+    .row-delete-btn {
+      width: 20px;
+      height: 20px;
+      border: none;
+      background: transparent;
+      color: var(--bengara);
+      cursor: pointer;
+      border-radius: 4px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .detail-table tr:hover .row-delete-btn {
+      opacity: 1;
+    }
+
+    .row-delete-btn:hover {
+      background: var(--bengara-light);
+    }
+
+    /* 列追加インジケーター */
+    .col-add-indicator {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 20px;
+      right: -10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 5;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .detail-table th:hover .col-add-indicator {
+      opacity: 1;
+    }
+
+    .col-add-indicator::before {
+      content: '+';
+      width: 18px;
+      height: 18px;
+      background: var(--teal);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    /* 行追加インジケーター */
+    .row-add-indicator {
+      height: 0;
+      position: relative;
+      cursor: pointer;
+    }
+
+    .row-add-indicator:hover::before {
+      content: '+';
+      position: absolute;
+      left: 50%;
+      top: -10px;
+      transform: translateX(-50%);
+      width: 20px;
+      height: 20px;
+      background: var(--teal);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: bold;
+      z-index: 10;
+    }
+
+    /* モーダル */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal {
+      background: var(--bg-white);
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      max-width: 500px;
+      width: 90%;
+      max-height: 80vh;
+      overflow: auto;
+      transform: scale(0.9);
+      transition: transform 0.3s;
+    }
+
+    .modal-overlay.active .modal {
+      transform: scale(1);
+    }
+
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-header h3 {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .modal-close {
+      width: 32px;
+      height: 32px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      border-radius: 6px;
+      font-size: 20px;
+      color: var(--text-secondary);
+    }
+
+    .modal-close:hover {
+      background: var(--bg-light);
+    }
+
+    .modal-body {
+      padding: 20px;
+    }
+
+    .modal-footer {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    /* ポップオーバー */
+    .popover {
+      position: absolute;
+      background: var(--bg-white);
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      z-index: 1000;
+      min-width: 200px;
+      display: none;
+    }
+
+    .popover.active {
+      display: block;
+    }
+
+    .popover-list {
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .popover-item {
+      padding: 10px 16px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .popover-item:hover {
+      background: var(--teal-light);
+    }
+
+    /* テンキー */
+    .numpad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      padding: 12px;
+    }
+
+    .numpad-btn {
+      padding: 16px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-white);
+      border-radius: 8px;
+      font-size: 18px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .numpad-btn:hover {
+      background: var(--teal-light);
+    }
+
+    .numpad-btn:active {
+      background: var(--teal);
+      color: white;
+    }
+
+    .numpad-btn.wide {
+      grid-column: span 2;
+    }
+
+    /* カレンダー */
+    .calendar {
+      padding: 12px;
+    }
+
+    .calendar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+    }
+
+    .calendar-cell {
+      padding: 8px;
+      text-align: center;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: background 0.15s;
+    }
+
+    .calendar-cell.header {
+      font-weight: 600;
+      color: var(--text-secondary);
+      cursor: default;
+    }
+
+    .calendar-cell:not(.header):hover {
+      background: var(--teal-light);
+    }
+
+    .calendar-cell.today {
+      border: 2px solid var(--teal);
+    }
+
+    .calendar-cell.selected {
+      background: var(--teal);
+      color: white;
+    }
+
+    /* コンテキストメニュー */
+    .context-menu {
+      position: fixed;
+      background: var(--bg-white);
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      z-index: 1000;
+      min-width: 150px;
+      display: none;
+      overflow: hidden;
+    }
+
+    .context-menu.active {
+      display: block;
+    }
+
+    .context-menu-item {
+      padding: 10px 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: background 0.15s;
+    }
+
+    .context-menu-item:hover {
+      background: var(--teal-light);
+    }
+
+    .context-menu-item.danger {
+      color: var(--bengara);
+    }
+
+    .context-menu-item.danger:hover {
+      background: var(--bengara-light);
+    }
+
+    /* アラートバナー */
+    .alert-banner {
+      padding: 10px 16px;
+      background: var(--bengara-light);
+      color: var(--bengara);
+      border-bottom: 1px solid var(--bengara);
+      display: none;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .alert-banner.active {
+      display: flex;
+    }
+
+    /* ファイル選択ボタン */
+    .file-input {
+      display: none;
+    }
+
+    /* ドキュメント選択用ドロップダウン */
+    .doc-selector {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .doc-selector select {
+      padding: 8px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-size: 14px;
+      min-width: 200px;
+    }
+  </style>
+</head>
+<body>
+  <!-- ローディングオーバーレイ -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- トースト通知 -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- コンテキストメニュー -->
+  <div class="context-menu" id="contextMenu">
+    <div class="context-menu-item" onclick="contextMenuAction('copy')">📋 コピー</div>
+    <div class="context-menu-item" onclick="contextMenuAction('cut')">✂️ カット</div>
+    <div class="context-menu-item" onclick="contextMenuAction('paste')">📄 ペースト</div>
+    <div class="context-menu-item danger" onclick="contextMenuAction('delete')">🗑️ 削除</div>
+  </div>
+
+  <!-- メインアプリ -->
+  <div class="app">
+    <header class="app-header">
+      <div class="app-title">
+        <span>📄</span>
+        ドキュメント管理システム
+      </div>
+      <nav class="nav-tabs">
+        <button class="nav-tab active" data-screen="list" onclick="switchScreen('list')">一覧</button>
+        <button class="nav-tab" data-screen="edit" onclick="switchScreen('edit')">編集</button>
+      </nav>
+    </header>
+
+    <main class="main-content">
+      <!-- ドキュメント一覧画面 -->
+      <div class="screen list-screen active" id="listScreen">
+        <div class="list-toolbar">
+          <div class="search-box">
+            <input type="text" class="form-input" placeholder="検索 (AND検索対応)..." id="searchInput" oninput="filterDocuments()">
+            <button class="btn btn-secondary" onclick="clearSearch()">クリア</button>
+          </div>
+          <div class="toolbar-actions">
+            <button class="btn btn-primary" onclick="openFileDialog()">
+              <span>📁</span> ドキュメント登録
+            </button>
+            <input type="file" class="file-input" id="fileInput" accept=".pdf" multiple onchange="handleFileSelect(event)">
+            <button class="btn btn-danger" onclick="deleteSelectedDocuments()" id="deleteBtn" disabled>
+              <span>🗑️</span> 削除
+            </button>
+            <button class="btn btn-secondary" onclick="togglePreview()">
+              <span>👁️</span> プレビュー
+            </button>
+          </div>
+        </div>
+
+        <div class="list-container">
+          <div class="table-area">
+            <div class="table-wrapper">
+              <table class="data-table" id="documentTable">
+                <thead>
+                  <tr>
+                    <th class="checkbox-cell">
+                      <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+                    </th>
+                    <th data-sort="name" onclick="sortTable('name')">ドキュメント名 <span class="sort-icon">↕</span></th>
+                    <th data-sort="partner" onclick="sortTable('partner')">取引先名 <span class="sort-icon">↕</span></th>
+                    <th data-sort="date" onclick="sortTable('date')">取引日 <span class="sort-icon">↕</span></th>
+                    <th data-sort="amount" onclick="sortTable('amount')">取引金額 <span class="sort-icon">↕</span></th>
+                    <th data-sort="creator" onclick="sortTable('creator')">登録者 <span class="sort-icon">↕</span></th>
+                    <th data-sort="createdAt" onclick="sortTable('createdAt')">登録日時 <span class="sort-icon">↕</span></th>
+                    <th data-sort="updater" onclick="sortTable('updater')">最終更新者 <span class="sort-icon">↕</span></th>
+                    <th data-sort="updatedAt" onclick="sortTable('updatedAt')">最終更新日時 <span class="sort-icon">↕</span></th>
+                  </tr>
+                </thead>
+                <tbody id="documentTableBody">
+                </tbody>
+              </table>
+            </div>
+            <div class="status-bar">
+              <span id="statusText">0件のドキュメント</span>
+              <span id="selectionText">0件選択中</span>
+            </div>
+          </div>
+
+          <div class="resizer" id="listResizer"></div>
+
+          <div class="preview-area" id="previewArea">
+            <div class="preview-header">
+              <h3>プレビュー</h3>
+              <button class="btn-icon" onclick="togglePreview()">✕</button>
+            </div>
+            <div class="preview-content" id="previewContent">
+              <div class="preview-placeholder">ドキュメントを選択してください</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 編集画面 -->
+      <div class="screen edit-screen" id="editScreen">
+        <div class="alert-banner" id="alertBanner">
+          <span>⚠️</span>
+          <span id="alertMessage"></span>
+        </div>
+
+        <div class="edit-header">
+          <div class="doc-selector">
+            <h2 id="editDocTitle">📄 ドキュメントを選択してください</h2>
+            <select id="docSelector" onchange="loadDocumentForEdit(this.value)">
+              <option value="">-- ドキュメントを選択 --</option>
+            </select>
+          </div>
+          <div class="edit-actions">
+            <button class="btn btn-secondary" onclick="resetEdit()">リセット</button>
+            <button class="btn btn-primary" onclick="saveDocument()">💾 保存</button>
+          </div>
+        </div>
+
+        <div class="edit-body">
+          <!-- 編集ツールバー -->
+          <div class="edit-toolbar">
+            <button class="tool-btn" data-tool="select" onclick="selectTool('select')" title="選択">🖱️</button>
+            <div class="tool-divider"></div>
+            <button class="tool-btn" data-tool="pen" onclick="selectTool('pen')" title="ペン">🖊️</button>
+            <button class="tool-btn" data-tool="marker" onclick="selectTool('marker')" title="マーカー">🖍️</button>
+            <button class="tool-btn" data-tool="sticky" onclick="selectTool('sticky')" title="付箋">📝</button>
+            <button class="tool-btn" data-tool="stamp" onclick="selectTool('stamp')" title="スタンプ">🔖</button>
+            <button class="tool-btn" data-tool="signature" onclick="selectTool('signature')" title="署名">✍️</button>
+            <div class="tool-divider"></div>
+            <button class="tool-btn" onclick="clearDrawing()" title="クリア">🗑️</button>
+          </div>
+
+          <!-- PDFプレビュー -->
+          <div class="pdf-preview-area" id="pdfPreviewArea">
+            <div class="canvas-container">
+              <div class="canvas-wrapper" id="canvasWrapper">
+                <canvas id="pdfCanvas"></canvas>
+                <canvas id="drawCanvas"></canvas>
+              </div>
+            </div>
+            <div class="pdf-controls">
+              <button class="btn btn-secondary" onclick="prevPage()">◀ 前ページ</button>
+              <span id="pageInfo">1 / 1</span>
+              <button class="btn btn-secondary" onclick="nextPage()">次ページ ▶</button>
+              <select id="zoomSelect" onchange="changeZoom(this.value)">
+                <option value="0.5">50%</option>
+                <option value="0.75">75%</option>
+                <option value="1" selected>100%</option>
+                <option value="1.25">125%</option>
+                <option value="1.5">150%</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="resizer" id="editResizer"></div>
+
+          <!-- 属性編集エリア -->
+          <div class="attributes-area" id="attributesArea">
+            <div class="attributes-panel">
+              <!-- 基本属性 -->
+              <div class="attr-section">
+                <div class="attr-section-header">
+                  <span class="attr-section-title">基本属性</span>
+                  <button class="btn btn-secondary" onclick="openAttributeSettings()">⚙️ 設定</button>
+                </div>
+
+                <div class="attr-row">
+                  <label class="attr-label required" id="label_partner">取引先名</label>
+                  <div class="attr-value">
+                    <input type="text" class="form-input" id="attr_partner" placeholder="取引先名を入力">
+                    <button class="btn-icon" onclick="openPartnerList()">📋</button>
+                  </div>
+                </div>
+
+                <div class="attr-row">
+                  <label class="attr-label required" id="label_date">取引日</label>
+                  <div class="attr-value">
+                    <input type="text" class="form-input" id="attr_date" placeholder="yyyy-MM-dd">
+                    <button class="btn-icon" onclick="openCalendar('attr_date')">📅</button>
+                  </div>
+                </div>
+
+                <div class="attr-row">
+                  <label class="attr-label" id="label_amount">取引金額</label>
+                  <div class="attr-value">
+                    <input type="text" class="form-input" id="attr_amount" placeholder="¥0">
+                    <button class="btn-icon" onclick="openNumpad('attr_amount')">🔢</button>
+                  </div>
+                </div>
+
+                <div id="customAttributes"></div>
+
+                <button class="btn btn-secondary" style="width:100%; margin-top:8px;" onclick="openAddAttributeModal()">
+                  ＋ 属性を追加
+                </button>
+              </div>
+
+              <!-- 明細情報 -->
+              <div class="attr-section detail-section">
+                <div class="attr-section-header">
+                  <span class="attr-section-title">明細情報</span>
+                  <button class="btn btn-secondary" onclick="openDetailSettings()">⚙️ 設定</button>
+                </div>
+
+                <div class="detail-table-wrapper" id="detailTableWrapper">
+                  <table class="detail-table" id="detailTable">
+                    <thead>
+                      <tr id="detailHeader">
+                      </tr>
+                    </thead>
+                    <tbody id="detailBody">
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style="margin-top:8px; display:flex; gap:8px;">
+                  <button class="btn btn-secondary" onclick="addDetailRow()">＋ 行を追加</button>
+                  <button class="btn btn-secondary" onclick="addDetailColumn()">＋ 列を追加</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 属性追加モーダル -->
+  <div class="modal-overlay" id="addAttributeModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>属性を追加</h3>
+        <button class="modal-close" onclick="closeModal('addAttributeModal')">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="attr-row">
+          <label class="attr-label">属性名</label>
+          <input type="text" class="form-input" id="newAttrName" style="flex:1;">
+        </div>
+        <div class="attr-row">
+          <label class="attr-label">型</label>
+          <select class="form-input" id="newAttrType" style="flex:1;">
+            <option value="text">文字列</option>
+            <option value="number">数値</option>
+            <option value="date">日付</option>
+          </select>
+        </div>
+        <div class="attr-row">
+          <label class="attr-label">必須</label>
+          <input type="checkbox" id="newAttrRequired">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('addAttributeModal')">キャンセル</button>
+        <button class="btn btn-primary" onclick="addCustomAttribute()">追加</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 列追加モーダル -->
+  <div class="modal-overlay" id="addColumnModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>列を追加</h3>
+        <button class="modal-close" onclick="closeModal('addColumnModal')">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="attr-row">
+          <label class="attr-label">列名</label>
+          <input type="text" class="form-input" id="newColName" style="flex:1;">
+        </div>
+        <div class="attr-row">
+          <label class="attr-label">型</label>
+          <select class="form-input" id="newColType" style="flex:1;">
+            <option value="text">文字列</option>
+            <option value="number">数値</option>
+          </select>
+        </div>
+        <div class="attr-row">
+          <label class="attr-label">自動計算</label>
+          <input type="text" class="form-input" id="newColFormula" style="flex:1;" placeholder="例: {単価}*{数量}">
+        </div>
+        <div class="attr-row">
+          <label class="attr-label">検証式</label>
+          <input type="text" class="form-input" id="newColValidation" style="flex:1;" placeholder="例: {単価}*{数量}">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('addColumnModal')">キャンセル</button>
+        <button class="btn btn-primary" onclick="addColumnConfirm()">追加</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ポップオーバー：取引先選択 -->
+  <div class="popover" id="partnerPopover">
+    <div class="popover-list" id="partnerList"></div>
+  </div>
+
+  <!-- ポップオーバー：カレンダー -->
+  <div class="popover" id="calendarPopover">
+    <div class="calendar" id="calendar"></div>
+  </div>
+
+  <!-- ポップオーバー：テンキー -->
+  <div class="popover" id="numpadPopover">
+    <div class="numpad">
+      <button class="numpad-btn" onclick="numpadInput('7')">7</button>
+      <button class="numpad-btn" onclick="numpadInput('8')">8</button>
+      <button class="numpad-btn" onclick="numpadInput('9')">9</button>
+      <button class="numpad-btn" onclick="numpadInput('4')">4</button>
+      <button class="numpad-btn" onclick="numpadInput('5')">5</button>
+      <button class="numpad-btn" onclick="numpadInput('6')">6</button>
+      <button class="numpad-btn" onclick="numpadInput('1')">1</button>
+      <button class="numpad-btn" onclick="numpadInput('2')">2</button>
+      <button class="numpad-btn" onclick="numpadInput('3')">3</button>
+      <button class="numpad-btn wide" onclick="numpadInput('0')">0</button>
+      <button class="numpad-btn" onclick="numpadInput('.')">.</button>
+      <button class="numpad-btn" onclick="numpadClear()">C</button>
+      <button class="numpad-btn wide" onclick="numpadBackspace()">←</button>
+      <button class="numpad-btn" onclick="closeNumpad()" style="background:var(--teal);color:white;">OK</button>
+    </div>
+  </div>
+
+  <script>
+    // PDF.js設定
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    // ==========================================
+    // グローバル状態
+    // ==========================================
+    let documents = [];
+    let selectedDocIds = new Set();
+    let currentSort = { field: 'name', asc: true };
+    let previewVisible = true;
+    let currentEditDoc = null;
+    let currentTool = 'select';
+    let pdfDoc = null;
+    let currentPage = 1;
+    let zoom = 1;
+    let isDrawing = false;
+    let drawCtx = null;
+    let lastX = 0, lastY = 0;
+    let currentNumpadTarget = null;
+    let currentCalendarTarget = null;
+    let clipboardData = [];
+    let selectedCells = [];
+    let insertColumnIndex = -1;
+
+    // 明細列定義
+    let detailColumns = [
+      { id: 'product', name: '商品名', type: 'text' },
+      { id: 'code', name: '商品コード', type: 'text' },
+      { id: 'price', name: '単価', type: 'number' },
+      { id: 'qty', name: '数量', type: 'number' },
+      { id: 'amount', name: '金額', type: 'number', formula: '{単価}*{数量}' }
+    ];
+
+    // 明細データ
+    let detailRows = [];
+
+    // 属性設定
+    let attributeSettings = {
+      partner: { required: true },
+      date: { required: true },
+      amount: { required: false }
+    };
+
+    // カスタム属性
+    let customAttributes = [];
+
+    // 取引先マスタ（サンプル）
+    const partnerMaster = [
+      '株式会社サンプル商事',
+      '株式会社テスト工業',
+      'ABC株式会社',
+      'テクノロジー株式会社',
+      '○○建設株式会社'
+    ];
+
+    // 商品マスタ（サンプル）
+    const productMaster = [
+      { name: 'Webシステム開発費', code: 'WEB-001' },
+      { name: '月額保守費用', code: 'MNT-001' },
+      { name: 'サーバー費用', code: 'SRV-001' },
+      { name: 'コンサルティング費', code: 'CST-001' }
+    ];
+
+    // ==========================================
+    // 初期化
+    // ==========================================
+    document.addEventListener('DOMContentLoaded', () => {
+      initializeApp();
+      setupResizers();
+      setupCanvasEvents();
+      setupKeyboardShortcuts();
+      initDetailTable();
+      loadMockData();
+    });
+
+    function initializeApp() {
+      // クリックでポップオーバーを閉じる
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('.popover') && !e.target.closest('.btn-icon')) {
+          closeAllPopovers();
+        }
+        if (!e.target.closest('.context-menu')) {
+          document.getElementById('contextMenu').classList.remove('active');
+        }
+      });
+    }
+
+    function loadMockData() {
+      // モックデータ
+      documents = [
+        {
+          id: '1',
+          name: '請求書_2024001.pdf',
+          partner: '株式会社サンプル商事',
+          date: '2024-12-15',
+          amount: 946000,
+          creator: '山田太郎',
+          createdAt: '2024-12-16 10:30:00',
+          updater: '山田太郎',
+          updatedAt: '2024-12-16 10:30:00'
+        },
+        {
+          id: '2',
+          name: '見積書_2024002.pdf',
+          partner: '株式会社テスト工業',
+          date: '2024-12-10',
+          amount: 1500000,
+          creator: '佐藤花子',
+          createdAt: '2024-12-10 14:20:00',
+          updater: '佐藤花子',
+          updatedAt: '2024-12-12 09:15:00'
+        },
+        {
+          id: '3',
+          name: '納品書_2024003.pdf',
+          partner: 'ABC株式会社',
+          date: '2024-12-08',
+          amount: 320000,
+          creator: '鈴木一郎',
+          createdAt: '2024-12-08 16:45:00',
+          updater: '山田太郎',
+          updatedAt: '2024-12-15 11:30:00'
+        }
+      ];
+
+      renderDocumentTable();
+      updateDocSelector();
+    }
+
+    // ==========================================
+    // 画面切り替え
+    // ==========================================
+    function switchScreen(screenId) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+
+      document.getElementById(screenId + 'Screen').classList.add('active');
+      document.querySelector(`.nav-tab[data-screen="${screenId}"]`).classList.add('active');
+
+      if (screenId === 'edit') {
+        updateDocSelector();
+      }
+    }
+
+    // ==========================================
+    // トースト通知
+    // ==========================================
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.innerHTML = `<span>${type === 'success' ? '✓' : type === 'warning' ? '⚠️' : '✕'}</span> ${message}`;
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // ==========================================
+    // ローディング
+    // ==========================================
+    function showLoading() {
+      document.getElementById('loadingOverlay').classList.add('active');
+    }
+
+    function hideLoading() {
+      document.getElementById('loadingOverlay').classList.remove('active');
+    }
+
+    // ==========================================
+    // ドキュメント一覧
+    // ==========================================
+    function renderDocumentTable() {
+      const tbody = document.getElementById('documentTableBody');
+      const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+
+      let filtered = documents;
+      if (searchTerm) {
+        const terms = searchTerm.split(/\s+/);
+        filtered = documents.filter(doc => {
+          return terms.every(term =>
+            doc.name.toLowerCase().includes(term) ||
+            doc.partner.toLowerCase().includes(term) ||
+            doc.creator.toLowerCase().includes(term)
+          );
+        });
+      }
+
+      // ソート
+      filtered.sort((a, b) => {
+        let aVal = a[currentSort.field];
+        let bVal = b[currentSort.field];
+        if (currentSort.field === 'amount') {
+          aVal = Number(aVal);
+          bVal = Number(bVal);
+        }
+        if (aVal < bVal) return currentSort.asc ? -1 : 1;
+        if (aVal > bVal) return currentSort.asc ? 1 : -1;
+        return 0;
+      });
+
+      tbody.innerHTML = filtered.map(doc => `
+        <tr data-id="${doc.id}" class="${selectedDocIds.has(doc.id) ? 'selected' : ''}"
+            onclick="selectDocument('${doc.id}', event)"
+            ondblclick="openEditScreen('${doc.id}')">
+          <td class="checkbox-cell">
+            <input type="checkbox" ${selectedDocIds.has(doc.id) ? 'checked' : ''}
+                   onclick="event.stopPropagation(); toggleDocSelection('${doc.id}')">
+          </td>
+          <td>${doc.name}</td>
+          <td>${doc.partner}</td>
+          <td>${doc.date}</td>
+          <td>¥${doc.amount.toLocaleString()}</td>
+          <td>${doc.creator}</td>
+          <td>${doc.createdAt}</td>
+          <td>${doc.updater}</td>
+          <td>${doc.updatedAt}</td>
+        </tr>
+      `).join('');
+
+      document.getElementById('statusText').textContent = `${filtered.length}件のドキュメント`;
+      updateSelectionStatus();
+
+      // ソートインジケーター更新
+      document.querySelectorAll('.data-table th').forEach(th => {
+        th.classList.remove('sorted');
+        if (th.dataset.sort === currentSort.field) {
+          th.classList.add('sorted');
+          th.querySelector('.sort-icon').textContent = currentSort.asc ? '↑' : '↓';
+        }
+      });
+    }
+
+    function selectDocument(id, event) {
+      if (event.target.type === 'checkbox') return;
+
+      if (!event.ctrlKey && !event.shiftKey) {
+        selectedDocIds.clear();
+      }
+
+      if (selectedDocIds.has(id)) {
+        selectedDocIds.delete(id);
+      } else {
+        selectedDocIds.add(id);
+      }
+
+      renderDocumentTable();
+      updatePreview(id);
+    }
+
+    function toggleDocSelection(id) {
+      if (selectedDocIds.has(id)) {
+        selectedDocIds.delete(id);
+      } else {
+        selectedDocIds.add(id);
+      }
+      renderDocumentTable();
+    }
+
+    function toggleSelectAll() {
+      const selectAllCheckbox = document.getElementById('selectAll');
+      if (selectAllCheckbox.checked) {
+        documents.forEach(doc => selectedDocIds.add(doc.id));
+      } else {
+        selectedDocIds.clear();
+      }
+      renderDocumentTable();
+    }
+
+    function updateSelectionStatus() {
+      document.getElementById('selectionText').textContent = `${selectedDocIds.size}件選択中`;
+      document.getElementById('deleteBtn').disabled = selectedDocIds.size === 0;
+    }
+
+    function sortTable(field) {
+      if (currentSort.field === field) {
+        currentSort.asc = !currentSort.asc;
+      } else {
+        currentSort.field = field;
+        currentSort.asc = true;
+      }
+      renderDocumentTable();
+    }
+
+    function filterDocuments() {
+      renderDocumentTable();
+    }
+
+    function clearSearch() {
+      document.getElementById('searchInput').value = '';
+      renderDocumentTable();
+    }
+
+    // ==========================================
+    // ファイル操作
+    // ==========================================
+    function openFileDialog() {
+      document.getElementById('fileInput').click();
+    }
+
+    function handleFileSelect(event) {
+      const files = event.target.files;
+      if (files.length === 0) return;
+
+      showLoading();
+
+      setTimeout(() => {
+        Array.from(files).forEach(file => {
+          const newDoc = {
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+            name: file.name,
+            partner: '',
+            date: new Date().toISOString().split('T')[0],
+            amount: 0,
+            creator: 'ユーザー',
+            createdAt: new Date().toLocaleString('ja-JP').replace(/\//g, '-'),
+            updater: 'ユーザー',
+            updatedAt: new Date().toLocaleString('ja-JP').replace(/\//g, '-'),
+            file: file
+          };
+          documents.push(newDoc);
+        });
+
+        hideLoading();
+        renderDocumentTable();
+        updateDocSelector();
+        showToast(`${files.length}件のドキュメントを登録しました`);
+        event.target.value = '';
+      }, 500);
+    }
+
+    function deleteSelectedDocuments() {
+      if (selectedDocIds.size === 0) return;
+
+      if (confirm(`${selectedDocIds.size}件のドキュメントを削除しますか？`)) {
+        showLoading();
+        setTimeout(() => {
+          documents = documents.filter(doc => !selectedDocIds.has(doc.id));
+          selectedDocIds.clear();
+          hideLoading();
+          renderDocumentTable();
+          updateDocSelector();
+          showToast('ドキュメントを削除しました');
+        }, 300);
+      }
+    }
+
+    // ==========================================
+    // プレビュー
+    // ==========================================
+    function togglePreview() {
+      previewVisible = !previewVisible;
+      document.getElementById('previewArea').classList.toggle('hidden', !previewVisible);
+    }
+
+    function updatePreview(docId) {
+      const doc = documents.find(d => d.id === docId);
+      const content = document.getElementById('previewContent');
+
+      if (!doc) {
+        content.innerHTML = '<div class="preview-placeholder">ドキュメントを選択してください</div>';
+        return;
+      }
+
+      // デモ用のプレビュー表示
+      content.innerHTML = `
+        <div style="text-align:center; padding:40px;">
+          <div style="font-size:48px; margin-bottom:16px;">📄</div>
+          <div style="font-weight:600; margin-bottom:8px;">${doc.name}</div>
+          <div style="color:var(--text-secondary); font-size:13px;">
+            取引先: ${doc.partner || '未設定'}<br>
+            取引日: ${doc.date}<br>
+            金額: ¥${doc.amount.toLocaleString()}
+          </div>
+        </div>
+      `;
+    }
+
+    // ==========================================
+    // リサイザー
+    // ==========================================
+    function setupResizers() {
+      setupResizer('listResizer', 'table-area', 'preview-area', 'list-container');
+      setupResizer('editResizer', 'pdf-preview-area', 'attributes-area', 'edit-body');
+    }
+
+    function setupResizer(resizerId, leftId, rightId, containerId) {
+      const resizer = document.getElementById(resizerId);
+      if (!resizer) return;
+
+      let isResizing = false;
+
+      resizer.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        resizer.classList.add('dragging');
+        document.body.style.cursor = 'col-resize';
+        e.preventDefault();
+      });
+
+      document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+
+        const container = resizer.parentElement;
+        const rect = container.getBoundingClientRect();
+        const leftElement = container.querySelector('.table-area, .pdf-preview-area');
+        const rightElement = container.querySelector('.preview-area, .attributes-area');
+
+        if (leftElement && rightElement) {
+          const newLeftWidth = e.clientX - rect.left;
+          const minWidth = 300;
+          const maxWidth = rect.width - 300;
+
+          if (newLeftWidth >= minWidth && newLeftWidth <= maxWidth) {
+            leftElement.style.flex = 'none';
+            leftElement.style.width = newLeftWidth + 'px';
+          }
+        }
+      });
+
+      document.addEventListener('mouseup', () => {
+        if (isResizing) {
+          isResizing = false;
+          resizer.classList.remove('dragging');
+          document.body.style.cursor = '';
+        }
+      });
+    }
+
+    // ==========================================
+    // 編集画面
+    // ==========================================
+    function updateDocSelector() {
+      const selector = document.getElementById('docSelector');
+      selector.innerHTML = '<option value="">-- ドキュメントを選択 --</option>' +
+        documents.map(doc => `<option value="${doc.id}">${doc.name}</option>`).join('');
+    }
+
+    function openEditScreen(docId) {
+      switchScreen('edit');
+      document.getElementById('docSelector').value = docId;
+      loadDocumentForEdit(docId);
+    }
+
+    function loadDocumentForEdit(docId) {
+      if (!docId) {
+        currentEditDoc = null;
+        document.getElementById('editDocTitle').textContent = '📄 ドキュメントを選択してください';
+        clearEditForm();
+        return;
+      }
+
+      currentEditDoc = documents.find(d => d.id === docId);
+      if (!currentEditDoc) return;
+
+      document.getElementById('editDocTitle').textContent = '📄 ' + currentEditDoc.name;
+
+      // 属性値をセット
+      document.getElementById('attr_partner').value = currentEditDoc.partner || '';
+      document.getElementById('attr_date').value = currentEditDoc.date || '';
+      document.getElementById('attr_amount').value = currentEditDoc.amount ? '¥' + currentEditDoc.amount.toLocaleString() : '';
+
+      // 明細データをリセット
+      detailRows = [
+        { product: '', code: '', price: '', qty: '', amount: '' },
+        { product: '', code: '', price: '', qty: '', amount: '' },
+        { product: '', code: '', price: '', qty: '', amount: '' },
+        { product: '', code: '', price: '', qty: '', amount: '' },
+        { product: '', code: '', price: '', qty: '', amount: '' }
+      ];
+      renderDetailTable();
+
+      // PDFのサンプル表示（実際のPDFがある場合は読み込む）
+      renderSamplePdf();
+
+      showToast('ドキュメントを読み込みました');
+    }
+
+    function clearEditForm() {
+      document.getElementById('attr_partner').value = '';
+      document.getElementById('attr_date').value = '';
+      document.getElementById('attr_amount').value = '';
+      detailRows = [];
+      renderDetailTable();
+    }
+
+    function resetEdit() {
+      if (currentEditDoc) {
+        loadDocumentForEdit(currentEditDoc.id);
+        showToast('変更をリセットしました', 'warning');
+      }
+    }
+
+    function saveDocument() {
+      if (!currentEditDoc) {
+        showToast('ドキュメントを選択してください', 'error');
+        return;
+      }
+
+      // バリデーション
+      const errors = validateForm();
+      if (errors.length > 0) {
+        showAlertBanner(errors[0]);
+        return;
+      }
+
+      showLoading();
+      setTimeout(() => {
+        currentEditDoc.partner = document.getElementById('attr_partner').value;
+        currentEditDoc.date = document.getElementById('attr_date').value;
+        currentEditDoc.amount = parseAmount(document.getElementById('attr_amount').value);
+        currentEditDoc.updater = 'ユーザー';
+        currentEditDoc.updatedAt = new Date().toLocaleString('ja-JP').replace(/\//g, '-');
+
+        hideLoading();
+        hideAlertBanner();
+        renderDocumentTable();
+        showToast('保存しました');
+      }, 500);
+    }
+
+    function validateForm() {
+      const errors = [];
+
+      if (attributeSettings.partner.required && !document.getElementById('attr_partner').value) {
+        document.getElementById('attr_partner').classList.add('error');
+        errors.push('必須項目が入力されていません: 取引先名');
+      } else {
+        document.getElementById('attr_partner').classList.remove('error');
+      }
+
+      if (attributeSettings.date.required && !document.getElementById('attr_date').value) {
+        document.getElementById('attr_date').classList.add('error');
+        errors.push('必須項目が入力されていません: 取引日');
+      } else {
+        document.getElementById('attr_date').classList.remove('error');
+      }
+
+      // 明細の検証
+      detailRows.forEach((row, idx) => {
+        detailColumns.forEach(col => {
+          if (col.formula) {
+            const calculated = evaluateFormula(col.formula, row);
+            const actual = parseFloat(row[col.id]) || 0;
+            if (calculated !== actual && actual !== 0) {
+              errors.push(`${idx + 1}行目の${col.name}が条件に一致しません`);
+            }
+          }
+        });
+      });
+
+      return errors;
+    }
+
+    function showAlertBanner(message) {
+      const banner = document.getElementById('alertBanner');
+      document.getElementById('alertMessage').textContent = message;
+      banner.classList.add('active');
+    }
+
+    function hideAlertBanner() {
+      document.getElementById('alertBanner').classList.remove('active');
+    }
+
+    function parseAmount(value) {
+      return parseInt(value.replace(/[¥,]/g, '')) || 0;
+    }
+
+    // ==========================================
+    // 描画ツール
+    // ==========================================
+    function selectTool(tool) {
+      currentTool = tool;
+      document.querySelectorAll('.tool-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tool === tool);
+      });
+
+      const drawCanvas = document.getElementById('drawCanvas');
+      drawCanvas.style.cursor = tool === 'select' ? 'default' : 'crosshair';
+
+      showToast(`${getToolName(tool)}を選択しました`);
+    }
+
+    function getToolName(tool) {
+      const names = {
+        select: '選択',
+        pen: 'ペン',
+        marker: 'マーカー',
+        sticky: '付箋',
+        stamp: 'スタンプ',
+        signature: '署名'
+      };
+      return names[tool] || tool;
+    }
+
+    function setupCanvasEvents() {
+      const drawCanvas = document.getElementById('drawCanvas');
+
+      drawCanvas.addEventListener('mousedown', startDrawing);
+      drawCanvas.addEventListener('mousemove', draw);
+      drawCanvas.addEventListener('mouseup', stopDrawing);
+      drawCanvas.addEventListener('mouseout', stopDrawing);
+    }
+
+    function startDrawing(e) {
+      if (currentTool === 'select') return;
+
+      isDrawing = true;
+      drawCtx = document.getElementById('drawCanvas').getContext('2d');
+
+      const rect = e.target.getBoundingClientRect();
+      lastX = e.clientX - rect.left;
+      lastY = e.clientY - rect.top;
+
+      if (currentTool === 'sticky') {
+        drawSticky(lastX, lastY);
+        isDrawing = false;
+      } else if (currentTool === 'stamp') {
+        drawStamp(lastX, lastY);
+        isDrawing = false;
+      } else if (currentTool === 'signature') {
+        drawSignature(lastX, lastY);
+        isDrawing = false;
+      }
+    }
+
+    function draw(e) {
+      if (!isDrawing || !drawCtx) return;
+
+      const rect = e.target.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      drawCtx.beginPath();
+      drawCtx.moveTo(lastX, lastY);
+      drawCtx.lineTo(x, y);
+
+      if (currentTool === 'pen') {
+        drawCtx.strokeStyle = '#000000';
+        drawCtx.lineWidth = 2;
+        drawCtx.globalAlpha = 1;
+      } else if (currentTool === 'marker') {
+        drawCtx.strokeStyle = '#ffff00';
+        drawCtx.lineWidth = 20;
+        drawCtx.globalAlpha = 0.4;
+      }
+
+      drawCtx.lineCap = 'round';
+      drawCtx.stroke();
+      drawCtx.globalAlpha = 1;
+
+      lastX = x;
+      lastY = y;
+    }
+
+    function stopDrawing() {
+      isDrawing = false;
+    }
+
+    function drawSticky(x, y) {
+      const text = prompt('付箋のテキストを入力:', '');
+      if (!text) return;
+
+      drawCtx.fillStyle = '#fff740';
+      drawCtx.fillRect(x, y, 150, 80);
+      drawCtx.strokeStyle = '#e6d800';
+      drawCtx.strokeRect(x, y, 150, 80);
+      drawCtx.fillStyle = '#333';
+      drawCtx.font = '12px sans-serif';
+      drawCtx.fillText(text, x + 10, y + 30, 130);
+    }
+
+    function drawStamp(x, y) {
+      drawCtx.beginPath();
+      drawCtx.arc(x, y, 30, 0, Math.PI * 2);
+      drawCtx.strokeStyle = '#cc0000';
+      drawCtx.lineWidth = 3;
+      drawCtx.stroke();
+      drawCtx.fillStyle = '#cc0000';
+      drawCtx.font = 'bold 12px sans-serif';
+      drawCtx.textAlign = 'center';
+      drawCtx.fillText('承認', x, y + 4);
+      drawCtx.textAlign = 'left';
+    }
+
+    function drawSignature(x, y) {
+      drawCtx.fillStyle = '#000080';
+      drawCtx.font = 'italic 24px cursive';
+      drawCtx.fillText('署名', x, y);
+    }
+
+    function clearDrawing() {
+      const drawCanvas = document.getElementById('drawCanvas');
+      const ctx = drawCanvas.getContext('2d');
+      ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+      showToast('描画をクリアしました');
+    }
+
+    function renderSamplePdf() {
+      const pdfCanvas = document.getElementById('pdfCanvas');
+      const drawCanvas = document.getElementById('drawCanvas');
+      const ctx = pdfCanvas.getContext('2d');
+
+      pdfCanvas.width = 595 * zoom;
+      pdfCanvas.height = 842 * zoom;
+      drawCanvas.width = pdfCanvas.width;
+      drawCanvas.height = pdfCanvas.height;
+
+      // サンプルPDFの描画
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, pdfCanvas.width, pdfCanvas.height);
+
+      ctx.fillStyle = '#333';
+      ctx.font = `bold ${24 * zoom}px sans-serif`;
+      ctx.fillText('請求書', 50 * zoom, 60 * zoom);
+
+      ctx.font = `${14 * zoom}px sans-serif`;
+      ctx.fillText(currentEditDoc ? currentEditDoc.name : 'サンプルドキュメント', 50 * zoom, 100 * zoom);
+      ctx.fillText('取引先: ' + (currentEditDoc ? currentEditDoc.partner || '未設定' : ''), 50 * zoom, 140 * zoom);
+      ctx.fillText('取引日: ' + (currentEditDoc ? currentEditDoc.date : ''), 50 * zoom, 170 * zoom);
+      ctx.fillText('金額: ¥' + (currentEditDoc ? currentEditDoc.amount.toLocaleString() : '0'), 50 * zoom, 200 * zoom);
+
+      // テーブル枠
+      ctx.strokeStyle = '#ccc';
+      ctx.strokeRect(50 * zoom, 250 * zoom, 500 * zoom, 200 * zoom);
+
+      document.getElementById('pageInfo').textContent = '1 / 1';
+    }
+
+    function prevPage() {
+      if (currentPage > 1) {
+        currentPage--;
+        renderSamplePdf();
+      }
+    }
+
+    function nextPage() {
+      currentPage++;
+      renderSamplePdf();
+    }
+
+    function changeZoom(value) {
+      zoom = parseFloat(value);
+      renderSamplePdf();
+    }
+
+    // ==========================================
+    // 明細テーブル
+    // ==========================================
+    function initDetailTable() {
+      detailRows = Array(5).fill(null).map(() => ({
+        product: '', code: '', price: '', qty: '', amount: ''
+      }));
+      renderDetailTable();
+    }
+
+    function renderDetailTable() {
+      renderDetailHeader();
+      renderDetailBody();
+    }
+
+    function renderDetailHeader() {
+      const header = document.getElementById('detailHeader');
+      header.innerHTML = detailColumns.map((col, idx) => `
+        <th draggable="true"
+            ondragstart="dragColumn(event, ${idx})"
+            ondragover="dragOverColumn(event, ${idx})"
+            ondrop="dropColumn(event, ${idx})"
+            ondragleave="dragLeaveColumn(event)"
+            oncontextmenu="showColumnContextMenu(event, ${idx})">
+          ${col.name}
+          <div class="col-add-indicator" onclick="event.stopPropagation(); insertColumnAt(${idx + 1})"></div>
+        </th>
+      `).join('') + '<th class="row-actions"></th>';
+    }
+
+    function renderDetailBody() {
+      const tbody = document.getElementById('detailBody');
+      tbody.innerHTML = detailRows.map((row, rowIdx) => `
+        <tr draggable="true"
+            ondragstart="dragRow(event, ${rowIdx})"
+            ondragover="dragOverRow(event, ${rowIdx})"
+            ondrop="dropRow(event, ${rowIdx})"
+            ondragleave="dragLeaveRow(event)">
+          ${detailColumns.map((col, colIdx) => {
+            const isReadonly = col.formula ? 'readonly' : '';
+            const cellClass = col.formula ? 'readonly' : '';
+            const value = col.formula ? evaluateFormula(col.formula, row) : (row[col.id] || '');
+            return `
+              <td class="${cellClass}"
+                  onclick="selectCell(${rowIdx}, ${colIdx}, event)"
+                  oncontextmenu="showCellContextMenu(event, ${rowIdx}, ${colIdx})">
+                <input type="text" value="${value}" ${isReadonly}
+                       data-row="${rowIdx}" data-col="${colIdx}"
+                       oninput="updateCellValue(${rowIdx}, '${col.id}', this.value)"
+                       onfocus="onCellFocus(${rowIdx}, ${colIdx})"
+                       onkeydown="handleCellKeydown(event, ${rowIdx}, ${colIdx})">
+              </td>
+            `;
+          }).join('')}
+          <td class="row-actions">
+            <button class="row-delete-btn" onclick="deleteRow(${rowIdx})">−</button>
+          </td>
+        </tr>
+        <tr class="row-add-indicator" onclick="insertRowAt(${rowIdx + 1})"></tr>
+      `).join('');
+    }
+
+    function evaluateFormula(formula, row) {
+      try {
+        let expr = formula;
+        detailColumns.forEach(col => {
+          const regex = new RegExp(`\\{${col.name}\\}`, 'g');
+          expr = expr.replace(regex, parseFloat(row[col.id]) || 0);
+        });
+        return eval(expr) || 0;
+      } catch {
+        return 0;
+      }
+    }
+
+    function updateCellValue(rowIdx, colId, value) {
+      detailRows[rowIdx][colId] = value;
+
+      // 自動計算のある列を更新
+      detailColumns.forEach((col, colIdx) => {
+        if (col.formula) {
+          const calculated = evaluateFormula(col.formula, detailRows[rowIdx]);
+          const input = document.querySelector(`input[data-row="${rowIdx}"][data-col="${colIdx}"]`);
+          if (input) input.value = calculated;
+        }
+      });
+    }
+
+    function addDetailRow() {
+      const newRow = {};
+      detailColumns.forEach(col => newRow[col.id] = '');
+      detailRows.push(newRow);
+      renderDetailTable();
+      showToast('行を追加しました');
+    }
+
+    function insertRowAt(index) {
+      const newRow = {};
+      detailColumns.forEach(col => newRow[col.id] = '');
+      detailRows.splice(index, 0, newRow);
+      renderDetailTable();
+      showToast('行を挿入しました');
+    }
+
+    function deleteRow(index) {
+      detailRows.splice(index, 1);
+      renderDetailTable();
+      showToast('行を削除しました');
+    }
+
+    function addDetailColumn() {
+      insertColumnIndex = detailColumns.length;
+      openModal('addColumnModal');
+    }
+
+    function insertColumnAt(index) {
+      insertColumnIndex = index;
+      openModal('addColumnModal');
+    }
+
+    function addColumnConfirm() {
+      const name = document.getElementById('newColName').value;
+      const type = document.getElementById('newColType').value;
+      const formula = document.getElementById('newColFormula').value;
+      const validation = document.getElementById('newColValidation').value;
+
+      if (!name) {
+        showToast('列名を入力してください', 'error');
+        return;
+      }
+
+      const newCol = {
+        id: 'col_' + Date.now(),
+        name,
+        type,
+        formula: formula || null,
+        validation: validation || null
+      };
+
+      detailColumns.splice(insertColumnIndex, 0, newCol);
+      detailRows.forEach(row => row[newCol.id] = '');
+
+      closeModal('addColumnModal');
+      document.getElementById('newColName').value = '';
+      document.getElementById('newColFormula').value = '';
+      document.getElementById('newColValidation').value = '';
+
+      renderDetailTable();
+      showToast('列を追加しました');
+    }
+
+    // 列のドラッグ&ドロップ
+    let draggedColIndex = -1;
+
+    function dragColumn(e, index) {
+      draggedColIndex = index;
+      e.dataTransfer.effectAllowed = 'move';
+    }
+
+    function dragOverColumn(e, index) {
+      e.preventDefault();
+      if (draggedColIndex !== index) {
+        e.target.closest('th').classList.add('drag-over');
+      }
+    }
+
+    function dragLeaveColumn(e) {
+      e.target.closest('th')?.classList.remove('drag-over');
+    }
+
+    function dropColumn(e, index) {
+      e.preventDefault();
+      e.target.closest('th')?.classList.remove('drag-over');
+
+      if (draggedColIndex !== -1 && draggedColIndex !== index) {
+        const col = detailColumns.splice(draggedColIndex, 1)[0];
+        detailColumns.splice(index, 0, col);
+        renderDetailTable();
+        showToast('列を移動しました');
+      }
+      draggedColIndex = -1;
+    }
+
+    // 行のドラッグ&ドロップ
+    let draggedRowIndex = -1;
+
+    function dragRow(e, index) {
+      draggedRowIndex = index;
+      e.target.classList.add('drag-row');
+    }
+
+    function dragOverRow(e, index) {
+      e.preventDefault();
+      if (draggedRowIndex !== index) {
+        e.target.closest('tr').classList.add('drag-over-row');
+      }
+    }
+
+    function dragLeaveRow(e) {
+      e.target.closest('tr')?.classList.remove('drag-over-row');
+    }
+
+    function dropRow(e, index) {
+      e.preventDefault();
+      document.querySelectorAll('.drag-over-row').forEach(el => el.classList.remove('drag-over-row'));
+
+      if (draggedRowIndex !== -1 && draggedRowIndex !== index) {
+        const row = detailRows.splice(draggedRowIndex, 1)[0];
+        detailRows.splice(index, 0, row);
+        renderDetailTable();
+        showToast('行を移動しました');
+      }
+      draggedRowIndex = -1;
+    }
+
+    // セル選択とコピー&ペースト
+    function selectCell(rowIdx, colIdx, e) {
+      if (e.shiftKey && selectedCells.length > 0) {
+        // 範囲選択
+        const start = selectedCells[0];
+        selectedCells = [];
+        const minRow = Math.min(start.row, rowIdx);
+        const maxRow = Math.max(start.row, rowIdx);
+        const minCol = Math.min(start.col, colIdx);
+        const maxCol = Math.max(start.col, colIdx);
+
+        for (let r = minRow; r <= maxRow; r++) {
+          for (let c = minCol; c <= maxCol; c++) {
+            selectedCells.push({ row: r, col: c });
+          }
+        }
+      } else {
+        selectedCells = [{ row: rowIdx, col: colIdx }];
+      }
+      highlightSelectedCells();
+    }
+
+    function highlightSelectedCells() {
+      document.querySelectorAll('.detail-table td').forEach(td => td.classList.remove('selected'));
+      selectedCells.forEach(cell => {
+        const td = document.querySelector(`input[data-row="${cell.row}"][data-col="${cell.col}"]`)?.parentElement;
+        td?.classList.add('selected');
+      });
+    }
+
+    function onCellFocus(rowIdx, colIdx) {
+      selectedCells = [{ row: rowIdx, col: colIdx }];
+      highlightSelectedCells();
+    }
+
+    function handleCellKeydown(e, rowIdx, colIdx) {
+      const maxRow = detailRows.length - 1;
+      const maxCol = detailColumns.length - 1;
+      let newRow = rowIdx, newCol = colIdx;
+
+      switch (e.key) {
+        case 'ArrowUp':
+          newRow = Math.max(0, rowIdx - 1);
+          break;
+        case 'ArrowDown':
+          newRow = Math.min(maxRow, rowIdx + 1);
+          break;
+        case 'ArrowLeft':
+          if (e.target.selectionStart === 0) {
+            newCol = Math.max(0, colIdx - 1);
+          }
+          break;
+        case 'ArrowRight':
+          if (e.target.selectionEnd === e.target.value.length) {
+            newCol = Math.min(maxCol, colIdx + 1);
+          }
+          break;
+        case 'Tab':
+          e.preventDefault();
+          newCol = e.shiftKey ? Math.max(0, colIdx - 1) : Math.min(maxCol, colIdx + 1);
+          break;
+        case 'Enter':
+          newRow = Math.min(maxRow, rowIdx + 1);
+          break;
+        default:
+          return;
+      }
+
+      if (newRow !== rowIdx || newCol !== colIdx) {
+        const input = document.querySelector(`input[data-row="${newRow}"][data-col="${newCol}"]`);
+        input?.focus();
+        e.preventDefault();
+      }
+    }
+
+    function setupKeyboardShortcuts() {
+      document.addEventListener('keydown', (e) => {
+        if (e.ctrlKey) {
+          switch (e.key) {
+            case 'c':
+              copySelectedCells();
+              break;
+            case 'x':
+              cutSelectedCells();
+              break;
+            case 'v':
+              pasteClipboard();
+              break;
+          }
+        }
+      });
+    }
+
+    function copySelectedCells() {
+      if (selectedCells.length === 0) return;
+
+      clipboardData = selectedCells.map(cell => ({
+        row: cell.row,
+        col: cell.col,
+        value: detailRows[cell.row][detailColumns[cell.col].id]
+      }));
+      showToast('コピーしました');
+    }
+
+    function cutSelectedCells() {
+      copySelectedCells();
+      selectedCells.forEach(cell => {
+        detailRows[cell.row][detailColumns[cell.col].id] = '';
+      });
+      renderDetailTable();
+      showToast('カットしました');
+    }
+
+    function pasteClipboard() {
+      if (clipboardData.length === 0 || selectedCells.length === 0) return;
+
+      const startCell = selectedCells[0];
+      const baseRow = Math.min(...clipboardData.map(c => c.row));
+      const baseCol = Math.min(...clipboardData.map(c => c.col));
+
+      clipboardData.forEach(data => {
+        const targetRow = startCell.row + (data.row - baseRow);
+        const targetCol = startCell.col + (data.col - baseCol);
+
+        if (targetRow < detailRows.length && targetCol < detailColumns.length) {
+          detailRows[targetRow][detailColumns[targetCol].id] = data.value;
+        }
+      });
+
+      renderDetailTable();
+      showToast('ペーストしました');
+    }
+
+    // コンテキストメニュー
+    function showColumnContextMenu(e, colIdx) {
+      e.preventDefault();
+      const menu = document.getElementById('contextMenu');
+      menu.innerHTML = `
+        <div class="context-menu-item danger" onclick="deleteColumn(${colIdx})">🗑️ 列を削除</div>
+      `;
+      menu.style.left = e.pageX + 'px';
+      menu.style.top = e.pageY + 'px';
+      menu.classList.add('active');
+    }
+
+    function showCellContextMenu(e, rowIdx, colIdx) {
+      e.preventDefault();
+      const menu = document.getElementById('contextMenu');
+      menu.innerHTML = `
+        <div class="context-menu-item" onclick="copySelectedCells()">📋 コピー</div>
+        <div class="context-menu-item" onclick="cutSelectedCells()">✂️ カット</div>
+        <div class="context-menu-item" onclick="pasteClipboard()">📄 ペースト</div>
+        <div class="context-menu-item danger" onclick="deleteRow(${rowIdx})">🗑️ 行を削除</div>
+      `;
+      menu.style.left = e.pageX + 'px';
+      menu.style.top = e.pageY + 'px';
+      menu.classList.add('active');
+    }
+
+    function deleteColumn(colIdx) {
+      const colId = detailColumns[colIdx].id;
+      detailColumns.splice(colIdx, 1);
+      detailRows.forEach(row => delete row[colId]);
+      renderDetailTable();
+      showToast('列を削除しました');
+      document.getElementById('contextMenu').classList.remove('active');
+    }
+
+    function contextMenuAction(action) {
+      switch (action) {
+        case 'copy':
+          copySelectedCells();
+          break;
+        case 'cut':
+          cutSelectedCells();
+          break;
+        case 'paste':
+          pasteClipboard();
+          break;
+        case 'delete':
+          if (selectedCells.length > 0) {
+            deleteRow(selectedCells[0].row);
+          }
+          break;
+      }
+      document.getElementById('contextMenu').classList.remove('active');
+    }
+
+    // ==========================================
+    // ポップオーバー
+    // ==========================================
+    function closeAllPopovers() {
+      document.querySelectorAll('.popover').forEach(p => p.classList.remove('active'));
+    }
+
+    function openPartnerList() {
+      const input = document.getElementById('attr_partner');
+      const popover = document.getElementById('partnerPopover');
+      const list = document.getElementById('partnerList');
+
+      list.innerHTML = partnerMaster.map(p =>
+        `<div class="popover-item" onclick="selectPartner('${p}')">${p}</div>`
+      ).join('');
+
+      const rect = input.getBoundingClientRect();
+      popover.style.top = (rect.bottom + 4) + 'px';
+      popover.style.left = rect.left + 'px';
+      popover.classList.add('active');
+    }
+
+    function selectPartner(value) {
+      document.getElementById('attr_partner').value = value;
+      closeAllPopovers();
+    }
+
+    function openCalendar(targetId) {
+      currentCalendarTarget = targetId;
+      const input = document.getElementById(targetId);
+      const popover = document.getElementById('calendarPopover');
+
+      renderCalendar(new Date());
+
+      const rect = input.getBoundingClientRect();
+      popover.style.top = (rect.bottom + 4) + 'px';
+      popover.style.left = rect.left + 'px';
+      popover.classList.add('active');
+    }
+
+    function renderCalendar(date) {
+      const calendar = document.getElementById('calendar');
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      const today = new Date();
+
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+      const days = ['日', '月', '火', '水', '木', '金', '土'];
+
+      let html = `
+        <div class="calendar-header">
+          <button class="btn btn-secondary" onclick="changeMonth(-1)">◀</button>
+          <span>${year}年${month + 1}月</span>
+          <button class="btn btn-secondary" onclick="changeMonth(1)">▶</button>
+        </div>
+        <div class="calendar-grid">
+          ${days.map(d => `<div class="calendar-cell header">${d}</div>`).join('')}
+      `;
+
+      for (let i = 0; i < firstDay; i++) {
+        html += '<div class="calendar-cell"></div>';
+      }
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const isToday = year === today.getFullYear() && month === today.getMonth() && d === today.getDate();
+        html += `<div class="calendar-cell ${isToday ? 'today' : ''}" onclick="selectDate(${year}, ${month}, ${d})">${d}</div>`;
+      }
+
+      html += '</div>';
+      calendar.innerHTML = html;
+      calendar.dataset.year = year;
+      calendar.dataset.month = month;
+    }
+
+    function changeMonth(delta) {
+      const calendar = document.getElementById('calendar');
+      const year = parseInt(calendar.dataset.year);
+      const month = parseInt(calendar.dataset.month);
+      renderCalendar(new Date(year, month + delta, 1));
+    }
+
+    function selectDate(year, month, day) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      document.getElementById(currentCalendarTarget).value = dateStr;
+      closeAllPopovers();
+    }
+
+    function openNumpad(targetId) {
+      currentNumpadTarget = targetId;
+      const input = document.getElementById(targetId);
+      const popover = document.getElementById('numpadPopover');
+
+      const rect = input.getBoundingClientRect();
+      popover.style.top = (rect.bottom + 4) + 'px';
+      popover.style.left = rect.left + 'px';
+      popover.classList.add('active');
+    }
+
+    function numpadInput(value) {
+      const input = document.getElementById(currentNumpadTarget);
+      let current = input.value.replace(/[¥,]/g, '');
+      current += value;
+      input.value = '¥' + parseInt(current || 0).toLocaleString();
+    }
+
+    function numpadClear() {
+      document.getElementById(currentNumpadTarget).value = '';
+    }
+
+    function numpadBackspace() {
+      const input = document.getElementById(currentNumpadTarget);
+      let current = input.value.replace(/[¥,]/g, '');
+      current = current.slice(0, -1);
+      input.value = current ? '¥' + parseInt(current).toLocaleString() : '';
+    }
+
+    function closeNumpad() {
+      closeAllPopovers();
+    }
+
+    // ==========================================
+    // モーダル
+    // ==========================================
+    function openModal(modalId) {
+      document.getElementById(modalId).classList.add('active');
+    }
+
+    function closeModal(modalId) {
+      document.getElementById(modalId).classList.remove('active');
+    }
+
+    // ==========================================
+    // カスタム属性
+    // ==========================================
+    function openAddAttributeModal() {
+      openModal('addAttributeModal');
+    }
+
+    function addCustomAttribute() {
+      const name = document.getElementById('newAttrName').value;
+      const type = document.getElementById('newAttrType').value;
+      const required = document.getElementById('newAttrRequired').checked;
+
+      if (!name) {
+        showToast('属性名を入力してください', 'error');
+        return;
+      }
+
+      const id = 'custom_' + Date.now();
+      customAttributes.push({ id, name, type, required });
+
+      renderCustomAttributes();
+      closeModal('addAttributeModal');
+      document.getElementById('newAttrName').value = '';
+      document.getElementById('newAttrRequired').checked = false;
+
+      showToast('属性を追加しました');
+    }
+
+    function renderCustomAttributes() {
+      const container = document.getElementById('customAttributes');
+      container.innerHTML = customAttributes.map(attr => `
+        <div class="attr-row">
+          <label class="attr-label ${attr.required ? 'required' : ''}">${attr.name}</label>
+          <div class="attr-value">
+            <input type="${attr.type === 'number' ? 'number' : 'text'}" class="form-input" id="${attr.id}">
+            <button class="btn-icon" onclick="deleteCustomAttribute('${attr.id}')" style="color:var(--bengara);">×</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function deleteCustomAttribute(id) {
+      customAttributes = customAttributes.filter(a => a.id !== id);
+      renderCustomAttributes();
+      showToast('属性を削除しました');
+    }
+
+    function openAttributeSettings() {
+      showToast('属性設定機能は開発中です', 'warning');
+    }
+
+    function openDetailSettings() {
+      showToast('明細設定機能は開発中です', 'warning');
+    }
+  </script>
+</body>
+</html>
