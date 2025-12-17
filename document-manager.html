@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ドキュメント管理システム</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     :root {
       --bg-base: #fafafa;
@@ -585,6 +586,86 @@
       cursor: crosshair;
     }
 
+    #ocrCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+    }
+
+    .ocr-selection {
+      position: absolute;
+      border: 2px dashed var(--teal);
+      background: rgba(0, 128, 128, 0.1);
+      pointer-events: none;
+    }
+
+    .ocr-mode-indicator {
+      position: fixed;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--teal);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .ocr-mode-indicator.active {
+      display: flex;
+    }
+
+    .ocr-mode-indicator .cancel-btn {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: white;
+      padding: 4px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .ocr-mode-indicator .cancel-btn:hover {
+      background: rgba(255,255,255,0.3);
+    }
+
+    .ocr-progress {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 24px 32px;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      z-index: 10000;
+      text-align: center;
+      display: none;
+    }
+
+    .ocr-progress.active {
+      display: block;
+    }
+
+    .ocr-progress-bar {
+      width: 200px;
+      height: 8px;
+      background: var(--bg-light);
+      border-radius: 4px;
+      margin-top: 12px;
+      overflow: hidden;
+    }
+
+    .ocr-progress-fill {
+      height: 100%;
+      background: var(--teal);
+      transition: width 0.3s;
+    }
+
     .pdf-controls {
       padding: 8px 16px;
       background: var(--bg-white);
@@ -1132,6 +1213,21 @@
   <!-- 選択情報表示 -->
   <div class="selection-info" id="selectionInfo"></div>
 
+  <!-- OCRモードインジケーター -->
+  <div class="ocr-mode-indicator" id="ocrModeIndicator">
+    <span>📷 画像上で領域をドラッグして選択してください</span>
+    <button class="cancel-btn" onclick="cancelOcrMode()">キャンセル</button>
+  </div>
+
+  <!-- OCR処理プログレス -->
+  <div class="ocr-progress" id="ocrProgress">
+    <div>🔍 OCR処理中...</div>
+    <div class="ocr-progress-bar">
+      <div class="ocr-progress-fill" id="ocrProgressFill" style="width: 0%"></div>
+    </div>
+    <div id="ocrProgressText" style="margin-top:8px; font-size:12px; color:#666;">初期化中...</div>
+  </div>
+
   <!-- コンテキストメニュー -->
   <div class="context-menu" id="contextMenu">
     <div class="context-menu-item" onclick="contextMenuAction('copy')">📋 コピー</div>
@@ -1249,6 +1345,8 @@
             <button class="tool-btn" data-tool="stamp" onclick="selectTool('stamp')" title="スタンプ">🔖</button>
             <button class="tool-btn" data-tool="signature" onclick="selectTool('signature')" title="署名">✍️</button>
             <div class="tool-divider"></div>
+            <button class="tool-btn" data-tool="ocr" onclick="startOcrMode()" title="OCR読取" id="ocrToolBtn">📷</button>
+            <div class="tool-divider"></div>
             <button class="tool-btn" onclick="clearDrawing()" title="クリア">🗑️</button>
           </div>
 
@@ -1258,6 +1356,7 @@
               <div class="canvas-wrapper" id="canvasWrapper">
                 <canvas id="pdfCanvas"></canvas>
                 <canvas id="drawCanvas"></canvas>
+                <div class="ocr-selection" id="ocrSelection" style="display:none;"></div>
               </div>
             </div>
             <div class="pdf-controls">
@@ -1471,6 +1570,12 @@
     let isMouseSelecting = false;
     let selectionStartCell = null;
     let selectionAnchorCell = null;
+
+    // OCR関連
+    let isOcrMode = false;
+    let ocrSelectionStart = null;
+    let isOcrSelecting = false;
+    let tesseractWorker = null;
 
     // 明細列定義
     let detailColumns = [
@@ -2047,10 +2152,35 @@
     function setupCanvasEvents() {
       const drawCanvas = document.getElementById('drawCanvas');
 
-      drawCanvas.addEventListener('mousedown', startDrawing);
-      drawCanvas.addEventListener('mousemove', draw);
-      drawCanvas.addEventListener('mouseup', stopDrawing);
-      drawCanvas.addEventListener('mouseout', stopDrawing);
+      drawCanvas.addEventListener('mousedown', (e) => {
+        if (isOcrMode) {
+          startOcrSelection(e);
+        } else {
+          startDrawing(e);
+        }
+      });
+
+      drawCanvas.addEventListener('mousemove', (e) => {
+        if (isOcrMode) {
+          updateOcrSelection(e);
+        } else {
+          draw(e);
+        }
+      });
+
+      drawCanvas.addEventListener('mouseup', (e) => {
+        if (isOcrMode) {
+          endOcrSelection(e);
+        } else {
+          stopDrawing(e);
+        }
+      });
+
+      drawCanvas.addEventListener('mouseout', (e) => {
+        if (!isOcrMode) {
+          stopDrawing(e);
+        }
+      });
     }
 
     function startDrawing(e) {
@@ -2921,6 +3051,202 @@
 
     function openDetailSettings() {
       showToast('明細設定機能は開発中です', 'warning');
+    }
+
+    // ==========================================
+    // OCR機能
+    // ==========================================
+    function startOcrMode() {
+      // セルが選択されているか確認
+      if (selectedCells.length === 0) {
+        showToast('先に明細テーブルのセルを選択してください', 'warning');
+        return;
+      }
+
+      isOcrMode = true;
+      document.getElementById('ocrModeIndicator').classList.add('active');
+      document.getElementById('ocrToolBtn').classList.add('active');
+      document.getElementById('drawCanvas').style.cursor = 'crosshair';
+
+      // 選択セル数を表示
+      const rows = new Set(selectedCells.map(c => c.row)).size;
+      showToast(`${selectedCells.length}個のセル (${rows}行) にOCR結果を入力します`);
+    }
+
+    function cancelOcrMode() {
+      isOcrMode = false;
+      isOcrSelecting = false;
+      ocrSelectionStart = null;
+      document.getElementById('ocrModeIndicator').classList.remove('active');
+      document.getElementById('ocrToolBtn').classList.remove('active');
+      document.getElementById('ocrSelection').style.display = 'none';
+      document.getElementById('drawCanvas').style.cursor = currentTool === 'select' ? 'default' : 'crosshair';
+    }
+
+    function startOcrSelection(e) {
+      const rect = e.target.getBoundingClientRect();
+      ocrSelectionStart = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      };
+      isOcrSelecting = true;
+
+      const selection = document.getElementById('ocrSelection');
+      selection.style.display = 'block';
+      selection.style.left = ocrSelectionStart.x + 'px';
+      selection.style.top = ocrSelectionStart.y + 'px';
+      selection.style.width = '0px';
+      selection.style.height = '0px';
+    }
+
+    function updateOcrSelection(e) {
+      if (!isOcrSelecting || !ocrSelectionStart) return;
+
+      const rect = e.target.getBoundingClientRect();
+      const currentX = e.clientX - rect.left;
+      const currentY = e.clientY - rect.top;
+
+      const selection = document.getElementById('ocrSelection');
+      const left = Math.min(ocrSelectionStart.x, currentX);
+      const top = Math.min(ocrSelectionStart.y, currentY);
+      const width = Math.abs(currentX - ocrSelectionStart.x);
+      const height = Math.abs(currentY - ocrSelectionStart.y);
+
+      selection.style.left = left + 'px';
+      selection.style.top = top + 'px';
+      selection.style.width = width + 'px';
+      selection.style.height = height + 'px';
+    }
+
+    async function endOcrSelection(e) {
+      if (!isOcrSelecting || !ocrSelectionStart) return;
+
+      const rect = e.target.getBoundingClientRect();
+      const endX = e.clientX - rect.left;
+      const endY = e.clientY - rect.top;
+
+      const left = Math.min(ocrSelectionStart.x, endX);
+      const top = Math.min(ocrSelectionStart.y, endY);
+      const width = Math.abs(endX - ocrSelectionStart.x);
+      const height = Math.abs(endY - ocrSelectionStart.y);
+
+      isOcrSelecting = false;
+
+      // 選択領域が小さすぎる場合はキャンセル
+      if (width < 10 || height < 10) {
+        document.getElementById('ocrSelection').style.display = 'none';
+        return;
+      }
+
+      // OCR実行
+      await performOcr(left, top, width, height);
+
+      // 選択領域を非表示
+      document.getElementById('ocrSelection').style.display = 'none';
+      cancelOcrMode();
+    }
+
+    async function performOcr(x, y, width, height) {
+      const pdfCanvas = document.getElementById('pdfCanvas');
+
+      // 選択領域を切り出すためのキャンバス
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = width;
+      tempCanvas.height = height;
+      const tempCtx = tempCanvas.getContext('2d');
+
+      // PDFキャンバスから選択領域をコピー
+      tempCtx.drawImage(pdfCanvas, x, y, width, height, 0, 0, width, height);
+
+      // プログレス表示
+      const progress = document.getElementById('ocrProgress');
+      const progressFill = document.getElementById('ocrProgressFill');
+      const progressText = document.getElementById('ocrProgressText');
+      progress.classList.add('active');
+      progressFill.style.width = '0%';
+      progressText.textContent = '初期化中...';
+
+      try {
+        // Tesseract.jsでOCR実行
+        const result = await Tesseract.recognize(
+          tempCanvas.toDataURL(),
+          'jpn+eng',
+          {
+            logger: (m) => {
+              if (m.status === 'recognizing text') {
+                const percent = Math.round(m.progress * 100);
+                progressFill.style.width = percent + '%';
+                progressText.textContent = `認識中... ${percent}%`;
+              } else {
+                progressText.textContent = m.status;
+              }
+            }
+          }
+        );
+
+        progress.classList.remove('active');
+
+        // 結果を取得
+        const text = result.data.text.trim();
+
+        if (!text) {
+          showToast('テキストを認識できませんでした', 'warning');
+          return;
+        }
+
+        // 行ごとに分割
+        const lines = text.split('\n').filter(line => line.trim());
+
+        // 選択されているセルに行ごとに入力
+        // 行ごとにグループ化
+        const rowGroups = {};
+        selectedCells.forEach(cell => {
+          if (!rowGroups[cell.row]) {
+            rowGroups[cell.row] = [];
+          }
+          rowGroups[cell.row].push(cell);
+        });
+
+        // 行をソート
+        const sortedRows = Object.keys(rowGroups).map(Number).sort((a, b) => a - b);
+
+        // 各行にOCR結果を入力
+        sortedRows.forEach((rowIdx, lineIdx) => {
+          if (lineIdx < lines.length) {
+            const cells = rowGroups[rowIdx].sort((a, b) => a.col - b.col);
+            const lineText = lines[lineIdx].trim();
+
+            // 行内の複数セルに分割して入力（タブやスペースで区切り）
+            const parts = lineText.split(/\t+|\s{2,}/).filter(p => p.trim());
+
+            cells.forEach((cell, partIdx) => {
+              if (partIdx < parts.length) {
+                const col = detailColumns[cell.col];
+                if (!col.formula) {
+                  detailRows[cell.row][col.id] = parts[partIdx].trim();
+                }
+              } else if (parts.length === 1) {
+                // 分割できない場合は最初のセルに全体を入力
+                if (partIdx === 0) {
+                  const col = detailColumns[cell.col];
+                  if (!col.formula) {
+                    detailRows[cell.row][col.id] = lineText;
+                  }
+                }
+              }
+            });
+          }
+        });
+
+        renderDetailTable();
+        highlightSelectedCells();
+        showToast(`${lines.length}行のテキストを認識しました`);
+
+      } catch (error) {
+        progress.classList.remove('active');
+        console.error('OCR error:', error);
+        showToast('OCR処理でエラーが発生しました', 'error');
+      }
     }
   </script>
 </body>
