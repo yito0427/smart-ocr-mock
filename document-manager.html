@@ -729,6 +729,41 @@
 
     .detail-table td.selected {
       background: var(--teal-light);
+      outline: 2px solid var(--teal);
+      outline-offset: -2px;
+    }
+
+    .detail-table td.selection-start {
+      background: #b2dfdb;
+    }
+
+    .detail-table td.in-selection-range {
+      background: rgba(0, 128, 128, 0.15);
+    }
+
+    .selection-info {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--teal);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      box-shadow: var(--shadow);
+      z-index: 1000;
+      display: none;
+    }
+
+    .selection-info.active {
+      display: block;
+      animation: fadeIn 0.2s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+      to { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
 
     .detail-table td.alert {
@@ -1094,6 +1129,9 @@
   <!-- トースト通知 -->
   <div class="toast-container" id="toastContainer"></div>
 
+  <!-- 選択情報表示 -->
+  <div class="selection-info" id="selectionInfo"></div>
+
   <!-- コンテキストメニュー -->
   <div class="context-menu" id="contextMenu">
     <div class="context-menu-item" onclick="contextMenuAction('copy')">📋 コピー</div>
@@ -1430,6 +1468,9 @@
     let clipboardData = [];
     let selectedCells = [];
     let insertColumnIndex = -1;
+    let isMouseSelecting = false;
+    let selectionStartCell = null;
+    let selectionAnchorCell = null;
 
     // 明細列定義
     let detailColumns = [
@@ -2198,7 +2239,11 @@
             const value = col.formula ? evaluateFormula(col.formula, row) : (row[col.id] || '');
             return `
               <td class="${cellClass}"
-                  onclick="selectCell(${rowIdx}, ${colIdx}, event)"
+                  data-cell-row="${rowIdx}"
+                  data-cell-col="${colIdx}"
+                  onmousedown="startCellSelection(${rowIdx}, ${colIdx}, event)"
+                  onmouseover="extendCellSelection(${rowIdx}, ${colIdx}, event)"
+                  onmouseup="endCellSelection(event)"
                   oncontextmenu="showCellContextMenu(event, ${rowIdx}, ${colIdx})">
                 <input type="text" value="${value}" ${isReadonly}
                        data-row="${rowIdx}" data-col="${colIdx}"
@@ -2214,6 +2259,9 @@
         </tr>
         <tr class="row-add-indicator" onclick="insertRowAt(${rowIdx + 1})"></tr>
       `).join('');
+
+      // マウスアップイベントをドキュメント全体に設定
+      document.addEventListener('mouseup', endCellSelection);
     }
 
     function evaluateFormula(formula, row) {
@@ -2370,44 +2418,153 @@
     }
 
     // セル選択とコピー&ペースト
-    function selectCell(rowIdx, colIdx, e) {
-      if (e.shiftKey && selectedCells.length > 0) {
-        // 範囲選択
-        const start = selectedCells[0];
-        selectedCells = [];
-        const minRow = Math.min(start.row, rowIdx);
-        const maxRow = Math.max(start.row, rowIdx);
-        const minCol = Math.min(start.col, colIdx);
-        const maxCol = Math.max(start.col, colIdx);
+    function startCellSelection(rowIdx, colIdx, e) {
+      // 入力フィールドクリック時はスキップ
+      if (e.target.tagName === 'INPUT') return;
 
-        for (let r = minRow; r <= maxRow; r++) {
-          for (let c = minCol; c <= maxCol; c++) {
-            selectedCells.push({ row: r, col: c });
-          }
+      e.preventDefault();
+
+      if (e.ctrlKey || e.metaKey) {
+        // Ctrl+クリック: 追加選択/選択解除
+        const existingIdx = selectedCells.findIndex(c => c.row === rowIdx && c.col === colIdx);
+        if (existingIdx >= 0) {
+          selectedCells.splice(existingIdx, 1);
+        } else {
+          selectedCells.push({ row: rowIdx, col: colIdx });
         }
+        selectionAnchorCell = { row: rowIdx, col: colIdx };
+      } else if (e.shiftKey && selectionAnchorCell) {
+        // Shift+クリック: 範囲選択
+        selectRange(selectionAnchorCell.row, selectionAnchorCell.col, rowIdx, colIdx);
       } else {
+        // 通常クリック: 新規選択開始
+        isMouseSelecting = true;
+        selectionStartCell = { row: rowIdx, col: colIdx };
+        selectionAnchorCell = { row: rowIdx, col: colIdx };
         selectedCells = [{ row: rowIdx, col: colIdx }];
       }
+
       highlightSelectedCells();
+      updateSelectionInfo();
+    }
+
+    function extendCellSelection(rowIdx, colIdx, e) {
+      if (!isMouseSelecting || !selectionStartCell) return;
+
+      // ドラッグ中の範囲選択
+      selectRange(selectionStartCell.row, selectionStartCell.col, rowIdx, colIdx);
+      highlightSelectedCells();
+      updateSelectionInfo();
+    }
+
+    function endCellSelection(e) {
+      if (isMouseSelecting) {
+        isMouseSelecting = false;
+        // ドラッグ終了時のフィードバック
+        if (selectedCells.length > 1) {
+          showToast(`${selectedCells.length}個のセルを選択`);
+        }
+      }
+    }
+
+    function selectRange(startRow, startCol, endRow, endCol) {
+      selectedCells = [];
+      const minRow = Math.min(startRow, endRow);
+      const maxRow = Math.max(startRow, endRow);
+      const minCol = Math.min(startCol, endCol);
+      const maxCol = Math.max(startCol, endCol);
+
+      for (let r = minRow; r <= maxRow; r++) {
+        for (let c = minCol; c <= maxCol; c++) {
+          selectedCells.push({ row: r, col: c });
+        }
+      }
     }
 
     function highlightSelectedCells() {
-      document.querySelectorAll('.detail-table td').forEach(td => td.classList.remove('selected'));
-      selectedCells.forEach(cell => {
-        const td = document.querySelector(`input[data-row="${cell.row}"][data-col="${cell.col}"]`)?.parentElement;
-        td?.classList.add('selected');
+      // すべてのセルからクラスを削除
+      document.querySelectorAll('.detail-table td').forEach(td => {
+        td.classList.remove('selected', 'selection-start', 'in-selection-range');
+      });
+
+      // 選択されたセルにクラスを追加
+      selectedCells.forEach((cell, idx) => {
+        const td = document.querySelector(`td[data-cell-row="${cell.row}"][data-cell-col="${cell.col}"]`);
+        if (td) {
+          td.classList.add('selected');
+          if (idx === 0 && selectedCells.length > 1) {
+            td.classList.add('selection-start');
+          }
+        }
       });
     }
 
+    function updateSelectionInfo() {
+      const info = document.getElementById('selectionInfo');
+      if (selectedCells.length > 1) {
+        // 行数と列数を計算
+        const rows = new Set(selectedCells.map(c => c.row)).size;
+        const cols = new Set(selectedCells.map(c => c.col)).size;
+        info.textContent = `${selectedCells.length}個のセル選択中 (${rows}行 × ${cols}列)`;
+        info.classList.add('active');
+      } else {
+        info.classList.remove('active');
+      }
+    }
+
     function onCellFocus(rowIdx, colIdx) {
-      selectedCells = [{ row: rowIdx, col: colIdx }];
+      if (!isMouseSelecting) {
+        selectionAnchorCell = { row: rowIdx, col: colIdx };
+        selectedCells = [{ row: rowIdx, col: colIdx }];
+        highlightSelectedCells();
+        updateSelectionInfo();
+      }
+    }
+
+    function clearCellSelection() {
+      selectedCells = [];
       highlightSelectedCells();
+      updateSelectionInfo();
     }
 
     function handleCellKeydown(e, rowIdx, colIdx) {
       const maxRow = detailRows.length - 1;
       const maxCol = detailColumns.length - 1;
       let newRow = rowIdx, newCol = colIdx;
+
+      // Escキーで選択解除
+      if (e.key === 'Escape') {
+        clearCellSelection();
+        return;
+      }
+
+      // Delete/Backspaceで選択セルをクリア
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedCells.length > 1) {
+        e.preventDefault();
+        selectedCells.forEach(cell => {
+          if (!detailColumns[cell.col].formula) {
+            detailRows[cell.row][detailColumns[cell.col].id] = '';
+          }
+        });
+        renderDetailTable();
+        showToast(`${selectedCells.length}個のセルをクリアしました`);
+        return;
+      }
+
+      // Ctrl+A で全選択
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+        e.preventDefault();
+        selectedCells = [];
+        for (let r = 0; r < detailRows.length; r++) {
+          for (let c = 0; c < detailColumns.length; c++) {
+            selectedCells.push({ row: r, col: c });
+          }
+        }
+        highlightSelectedCells();
+        updateSelectionInfo();
+        showToast(`全${selectedCells.length}個のセルを選択`);
+        return;
+      }
 
       switch (e.key) {
         case 'ArrowUp':
@@ -2417,12 +2574,12 @@
           newRow = Math.min(maxRow, rowIdx + 1);
           break;
         case 'ArrowLeft':
-          if (e.target.selectionStart === 0) {
+          if (e.target.selectionStart === 0 || e.shiftKey) {
             newCol = Math.max(0, colIdx - 1);
           }
           break;
         case 'ArrowRight':
-          if (e.target.selectionEnd === e.target.value.length) {
+          if (e.target.selectionEnd === e.target.value.length || e.shiftKey) {
             newCol = Math.min(maxCol, colIdx + 1);
           }
           break;
@@ -2438,9 +2595,30 @@
       }
 
       if (newRow !== rowIdx || newCol !== colIdx) {
-        const input = document.querySelector(`input[data-row="${newRow}"][data-col="${newCol}"]`);
-        input?.focus();
-        e.preventDefault();
+        // Shift+矢印キーで範囲選択を拡張
+        if (e.shiftKey && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+          e.preventDefault();
+          if (!selectionAnchorCell) {
+            selectionAnchorCell = { row: rowIdx, col: colIdx };
+          }
+          selectRange(selectionAnchorCell.row, selectionAnchorCell.col, newRow, newCol);
+          highlightSelectedCells();
+          updateSelectionInfo();
+
+          // 新しいセルにフォーカス
+          const input = document.querySelector(`input[data-row="${newRow}"][data-col="${newCol}"]`);
+          input?.focus();
+        } else {
+          // 通常の移動
+          selectionAnchorCell = { row: newRow, col: newCol };
+          selectedCells = [{ row: newRow, col: newCol }];
+          highlightSelectedCells();
+          updateSelectionInfo();
+
+          const input = document.querySelector(`input[data-row="${newRow}"][data-col="${newCol}"]`);
+          input?.focus();
+          e.preventDefault();
+        }
       }
     }
 
