@@ -577,10 +577,11 @@
     }
 
     .detail-table-wrapper {
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
+      border: 2px solid #4a90d9;
+      border-radius: 0;
       overflow: auto;
       max-height: 400px;
+      background: #fff;
     }
 
     .detail-table {
@@ -591,36 +592,45 @@
 
     .detail-table th,
     .detail-table td {
-      border: 1px solid var(--border-color);
+      border: 1px solid #b8d4f0;
       padding: 0;
       position: relative;
       white-space: nowrap;
     }
 
     .detail-table th {
-      background: var(--bg-light);
-      font-weight: 600;
+      background: linear-gradient(180deg, #5ba2e0 0%, #4a90d9 100%);
+      color: white;
+      font-weight: 500;
       user-select: none;
+      text-shadow: 0 1px 1px rgba(0,0,0,0.2);
     }
 
     .detail-table .row-number {
-      background: var(--bg-light);
-      color: var(--text-secondary);
+      background: linear-gradient(180deg, #e8e8e8 0%, #d0d0d0 100%);
+      color: #555;
       width: 40px;
       min-width: 40px;
       text-align: center;
       font-size: 11px;
       padding: 6px 4px;
+      border-right: 2px solid #4a90d9;
+    }
+
+    .detail-table thead .row-number {
+      background: linear-gradient(180deg, #5ba2e0 0%, #4a90d9 100%);
+      color: white;
     }
 
     .detail-table .header-cell {
-      padding: 8px 6px;
+      padding: 8px 10px;
       min-width: 80px;
       cursor: pointer;
       position: relative;
+      text-align: center;
     }
 
-    .detail-table .header-cell:hover { background: var(--border-color); }
+    .detail-table .header-cell:hover { background: #6ab0e8; }
 
     .col-resizer {
       position: absolute;
@@ -635,55 +645,54 @@
     .col-resizer:hover { background: var(--teal); }
 
     .detail-table td {
-      background: var(--bg-white);
+      background: #fff;
+    }
+
+    .detail-table tbody tr:nth-child(even) td:not(.row-number) {
+      background: #f8fbff;
     }
 
     .cell-content {
       padding: 6px 8px;
-      min-height: 28px;
+      min-height: 26px;
       outline: none;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
     .cell-content:focus {
-      background: #fff;
+      background: #fffef0;
     }
 
     .detail-table td.selected {
-      outline: 2px solid var(--teal);
+      outline: 2px solid #4a90d9;
       outline-offset: -2px;
-      background: var(--teal-light);
+      background: #d6eaff !important;
     }
 
     .detail-table td.modified {
-      background: #fff3cd;
+      background: #fff9e6 !important;
     }
 
-    .detail-table td.modified::after {
-      content: '';
+    .detail-table td.modified .cell-content::before {
+      content: '●';
       position: absolute;
       top: 2px;
-      right: 2px;
-      width: 6px;
-      height: 6px;
-      background: var(--mustard);
-      border-radius: 50%;
+      right: 4px;
+      font-size: 8px;
+      color: #e6a000;
     }
 
     .detail-table td.formula {
-      background: #e8f5e9;
-      color: var(--text-secondary);
+      background: #f0f0f0 !important;
+      color: #666;
     }
 
-    /* 確信度表示 */
-    .confidence-high { background: rgba(76,175,80,0.15) !important; }
-    .confidence-mid { background: rgba(255,152,0,0.15) !important; }
-    .confidence-low { background: rgba(244,67,54,0.15) !important; }
+    /* セル選択情報バー */
 
     /* ページ区切り */
     .page-break-row td {
-      background: var(--teal) !important;
+      background: linear-gradient(180deg, #5ba2e0 0%, #4a90d9 100%) !important;
       color: white;
       text-align: center;
       padding: 4px;
@@ -1650,17 +1659,9 @@
         bodyHtml += `<td class="row-number">${rowNum}</td>`;
         detailColumns.forEach((col, colIdx) => {
           const value = row[col.id] || '';
-          const conf = row.confidence?.[col.id];
-          let confClass = '';
-          if (conf !== undefined) {
-            if (conf >= 0.9) confClass = 'confidence-high';
-            else if (conf >= 0.7) confClass = 'confidence-mid';
-            else confClass = 'confidence-low';
-          }
           const isModified = row.original?.[col.id] !== undefined && row.original[col.id] !== value;
           const isFormula = col.formula;
           const cellClass = [
-            confClass,
             isModified ? 'modified' : '',
             isFormula ? 'formula' : '',
             selectedCells.some(c => c.row === rowIdx && c.col === colIdx) ? 'selected' : ''
