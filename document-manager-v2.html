@@ -577,60 +577,57 @@
     }
 
     .detail-table-wrapper {
-      border: 2px solid #4a90d9;
-      border-radius: 0;
       overflow: auto;
       max-height: 400px;
-      background: #fff;
+      background: var(--bg-base);
     }
 
     .detail-table {
-      border-collapse: collapse;
-      font-size: 12px;
+      border-collapse: separate;
+      border-spacing: 6px 4px;
+      font-size: 13px;
       min-width: 100%;
     }
 
     .detail-table th,
     .detail-table td {
-      border: 1px solid #b8d4f0;
       padding: 0;
       position: relative;
       white-space: nowrap;
     }
 
     .detail-table th {
-      background: linear-gradient(180deg, #5ba2e0 0%, #4a90d9 100%);
-      color: white;
+      background: transparent;
+      color: var(--text-secondary);
       font-weight: 500;
+      font-size: 12px;
       user-select: none;
-      text-shadow: 0 1px 1px rgba(0,0,0,0.2);
     }
 
     .detail-table .row-number {
-      background: linear-gradient(180deg, #e8e8e8 0%, #d0d0d0 100%);
-      color: #555;
-      width: 40px;
-      min-width: 40px;
+      background: transparent;
+      color: var(--text-secondary);
+      width: 28px;
+      min-width: 28px;
       text-align: center;
       font-size: 11px;
-      padding: 6px 4px;
-      border-right: 2px solid #4a90d9;
+      padding: 8px 2px;
+      vertical-align: middle;
     }
 
     .detail-table thead .row-number {
-      background: linear-gradient(180deg, #5ba2e0 0%, #4a90d9 100%);
-      color: white;
+      color: var(--text-secondary);
     }
 
     .detail-table .header-cell {
-      padding: 8px 10px;
+      padding: 6px 8px;
       min-width: 80px;
       cursor: pointer;
       position: relative;
-      text-align: center;
+      text-align: left;
     }
 
-    .detail-table .header-cell:hover { background: #6ab0e8; }
+    .detail-table .header-cell:hover { color: var(--teal); }
 
     .col-resizer {
       position: absolute;
@@ -645,58 +642,66 @@
     .col-resizer:hover { background: var(--teal); }
 
     .detail-table td {
-      background: #fff;
-    }
-
-    .detail-table tbody tr:nth-child(even) td:not(.row-number) {
-      background: #f8fbff;
+      background: transparent;
     }
 
     .cell-content {
-      padding: 6px 8px;
-      min-height: 26px;
+      padding: 8px 12px;
+      min-height: 36px;
+      background: var(--bg-white);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
       outline: none;
       overflow: hidden;
       text-overflow: ellipsis;
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
 
     .cell-content:focus {
-      background: #fffef0;
+      border-color: var(--teal);
+      box-shadow: 0 0 0 3px var(--teal-light);
     }
 
-    .detail-table td.selected {
-      outline: 2px solid #4a90d9;
-      outline-offset: -2px;
-      background: #d6eaff !important;
+    .detail-table td.selected .cell-content {
+      border-color: var(--teal);
+      box-shadow: 0 0 0 3px var(--teal-light);
+      background: #fff;
     }
 
-    .detail-table td.modified {
-      background: #fff9e6 !important;
+    .detail-table td.modified .cell-content {
+      background: #fffef5;
+      border-color: var(--mustard);
     }
 
-    .detail-table td.modified .cell-content::before {
+    .detail-table td.modified .cell-content::after {
       content: '●';
       position: absolute;
-      top: 2px;
-      right: 4px;
+      top: 4px;
+      right: 6px;
       font-size: 8px;
-      color: #e6a000;
+      color: var(--mustard);
     }
 
-    .detail-table td.formula {
-      background: #f0f0f0 !important;
-      color: #666;
+    .detail-table td.formula .cell-content {
+      background: var(--bg-light);
+      color: var(--text-secondary);
     }
 
     /* セル選択情報バー */
 
     /* ページ区切り */
     .page-break-row td {
-      background: linear-gradient(180deg, #5ba2e0 0%, #4a90d9 100%) !important;
-      color: white;
+      background: transparent !important;
+      padding: 8px 0;
+    }
+
+    .page-break-row td .cell-content {
+      background: var(--teal-light);
+      border: 1px dashed var(--teal);
+      color: var(--teal);
       text-align: center;
-      padding: 4px;
       font-size: 11px;
+      padding: 6px 12px;
     }
 
     /* ツールチップ */
@@ -1651,7 +1656,7 @@
       let rowNum = 1;
       detailRows.forEach((row, rowIdx) => {
         if (row.pageBreak) {
-          bodyHtml += `<tr class="page-break-row"><td colspan="${detailColumns.length + 1}">── ページ区切り (${rowNum > 1 ? 'Page 1' : ''} / Page 2) ──</td></tr>`;
+          bodyHtml += `<tr class="page-break-row"><td colspan="${detailColumns.length + 1}"><div class="cell-content">── ページ区切り ──</div></td></tr>`;
           return;
         }
 
