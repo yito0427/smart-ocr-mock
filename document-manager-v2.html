@@ -696,16 +696,18 @@
     /* ページ区切り */
     .page-break-row td {
       background: transparent !important;
-      padding: 8px 0;
+      padding: 6px 0;
     }
 
-    .page-break-row td .cell-content {
-      background: var(--teal-light);
-      border: 1px dashed var(--teal);
-      color: var(--teal);
-      text-align: center;
-      font-size: 11px;
-      padding: 6px 12px;
+    .page-break-label {
+      display: inline-block;
+      background: linear-gradient(180deg, #5ba2e0 0%, #4a90d9 100%);
+      color: white;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 5px 20px;
+      border-radius: 3px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
     }
 
     /* ツールチップ */
@@ -1693,9 +1695,11 @@
       // ボディ
       let bodyHtml = '';
       let rowNum = 1;
+      let pageNum = 2; // ページ区切り後のページ番号
       detailRows.forEach((row, rowIdx) => {
         if (row.pageBreak) {
-          bodyHtml += `<tr class="page-break-row"><td colspan="${detailColumns.length + 1}"><div class="cell-content">── ページ区切り ──</div></td></tr>`;
+          bodyHtml += `<tr class="page-break-row"><td colspan="${detailColumns.length + 1}"><span class="page-break-label">${pageNum}ページ</span></td></tr>`;
+          pageNum++;
           return;
         }
 
