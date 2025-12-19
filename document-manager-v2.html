@@ -599,8 +599,36 @@
       vertical-align: top;
     }
 
-    .detail-table thead {
-      display: none;
+    .detail-table thead th {
+      background: #fffbf0;
+      color: var(--text-primary);
+      font-weight: 500;
+      font-size: 12px;
+      padding: 8px 12px;
+      text-align: left;
+      border-bottom: 1px solid #e8e0d0;
+      position: relative;
+    }
+
+    .detail-table thead th.row-number-header {
+      background: #fffbf0;
+      width: 28px;
+      min-width: 28px;
+      padding: 8px 4px;
+    }
+
+    .detail-table thead th .col-resizer {
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 6px;
+      cursor: col-resize;
+      background: transparent;
+    }
+
+    .detail-table thead th .col-resizer:hover {
+      background: var(--teal);
     }
 
     .detail-table .row-number {
@@ -614,44 +642,8 @@
       vertical-align: middle;
     }
 
-    .detail-table .first-row .row-number {
-      padding-top: 24px;
-      vertical-align: top;
-    }
-
     .detail-table td {
       background: transparent;
-    }
-
-    .cell-wrapper {
-      position: relative;
-    }
-
-    .cell-label {
-      font-size: 11px;
-      color: var(--text-secondary);
-      margin-bottom: 2px;
-      padding-left: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .cell-label .col-resizer {
-      width: 12px;
-      height: 12px;
-      cursor: col-resize;
-      opacity: 0;
-      transition: opacity 0.2s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 10px;
-      color: var(--text-secondary);
-    }
-
-    .cell-wrapper:hover .col-resizer {
-      opacity: 1;
     }
 
     .cell-content {
@@ -1689,10 +1681,13 @@
       const thead = document.getElementById('detailTableHead');
       const tbody = document.getElementById('detailTableBody');
 
-      // ヘッダー（非表示だが列幅管理用に残す）
-      let headerHtml = '<tr><th class="row-number">#</th>';
+      // ヘッダー行（列名を表示）
+      let headerHtml = '<tr><th class="row-number-header">#</th>';
       detailColumns.forEach((col, idx) => {
-        headerHtml += `<th style="width:${col.width}px;min-width:${col.width}px;"></th>`;
+        headerHtml += `<th style="width:${col.width}px;min-width:${col.width}px;">
+          ${col.name}
+          <span class="col-resizer" onmousedown="startColResize(event,${idx})"></span>
+        </th>`;
       });
       headerHtml += '</tr>';
       thead.innerHTML = headerHtml;
@@ -1708,7 +1703,7 @@
           return;
         }
 
-        bodyHtml += `<tr class="${rowNum === 1 ? 'first-row' : ''}">`;
+        bodyHtml += '<tr>';
         bodyHtml += `<td class="row-number">${rowNum}</td>`;
         detailColumns.forEach((col, colIdx) => {
           const value = row[col.id] || '';
@@ -1727,16 +1722,10 @@
                           onmouseenter="showCellTooltip(event,${rowIdx},${colIdx})"
                           onmouseleave="hideCellTooltip()"
                           oncontextmenu="showColumnMenu(event,${colIdx})">
-                        <div class="cell-wrapper">
-                          ${rowNum === 1 ? `<div class="cell-label">
-                            <span>${col.name}</span>
-                            <span class="col-resizer" onmousedown="startColResize(event,${colIdx})">⋮</span>
-                          </div>` : ''}
-                          <div class="cell-content"
-                               contenteditable="${!isFormula}"
-                               oninput="handleCellInput(event,${rowIdx},'${col.id}')"
-                               onblur="handleCellBlur(event,${rowIdx},'${col.id}')">${value}</div>
-                        </div>
+                        <div class="cell-content"
+                             contenteditable="${!isFormula}"
+                             oninput="handleCellInput(event,${rowIdx},'${col.id}')"
+                             onblur="handleCellBlur(event,${rowIdx},'${col.id}')">${value}</div>
                       </td>`;
         });
         bodyHtml += '</tr>';
