@@ -394,18 +394,20 @@
       display: none;
     }
 
-    /* 確信度ハイライト */
+    /* 確信度ハイライト（スマートOCR風） */
     .highlight-box {
       position: absolute;
-      border: 2px solid;
       pointer-events: none;
-      opacity: 0.7;
     }
 
-    .highlight-box.high { border-color: var(--confidence-high); background: rgba(76,175,80,0.1); }
-    .highlight-box.mid { border-color: var(--confidence-mid); background: rgba(255,152,0,0.1); }
-    .highlight-box.low { border-color: var(--confidence-low); background: rgba(244,67,54,0.1); }
-    .highlight-box.selected { border-width: 3px; opacity: 1; box-shadow: 0 0 10px rgba(0,128,128,0.5); }
+    .highlight-box.high { background: rgba(173, 216, 255, 0.6); }
+    .highlight-box.mid { background: rgba(255, 255, 180, 0.7); }
+    .highlight-box.low { background: rgba(255, 200, 200, 0.7); }
+    .highlight-box.selected {
+      outline: 3px solid var(--teal);
+      outline-offset: -1px;
+      box-shadow: 0 0 8px rgba(0,128,128,0.5);
+    }
 
     /* 右パネル */
     .edit-panel {
@@ -1111,12 +1113,37 @@
     let undoStack = [];
     let redoStack = [];
 
-    // 確信度ハイライトデータ
+    // 確信度ハイライトデータ（スマートOCR風）
     let highlightBoxes = [
-      { x: 50, y: 200, w: 150, h: 20, confidence: 0.95, field: 'productName', row: 0 },
-      { x: 210, y: 200, w: 80, h: 20, confidence: 0.88, field: 'productCode', row: 0 },
-      { x: 50, y: 230, w: 150, h: 20, confidence: 0.92, field: 'productName', row: 1 },
-      { x: 210, y: 230, w: 80, h: 20, confidence: 0.65, field: 'productCode', row: 2 }
+      // ヘッダー部分
+      { x: 50, y: 92, w: 150, h: 18, confidence: 0.95, field: 'partner', page: 1 },
+      { x: 420, y: 32, w: 120, h: 16, confidence: 0.92, field: 'date', page: 1 },
+      { x: 420, y: 48, w: 140, h: 16, confidence: 0.88, field: 'invoiceNo', page: 1 },
+      { x: 50, y: 162, w: 180, h: 18, confidence: 0.75, field: 'amount', page: 1 },
+      // 明細1行目
+      { x: 55, y: 238, w: 110, h: 18, confidence: 0.95, field: 'productName', row: 0, page: 1 },
+      { x: 175, y: 238, w: 90, h: 18, confidence: 0.88, field: 'productCode', row: 0, page: 1 },
+      { x: 275, y: 238, w: 70, h: 18, confidence: 0.72, field: 'unitPrice', row: 0, page: 1 },
+      { x: 355, y: 238, w: 40, h: 18, confidence: 0.95, field: 'quantity', row: 0, page: 1 },
+      { x: 435, y: 238, w: 80, h: 18, confidence: 0.90, field: 'amount', row: 0, page: 1 },
+      // 明細2行目
+      { x: 55, y: 263, w: 110, h: 18, confidence: 0.92, field: 'productName', row: 1, page: 1 },
+      { x: 175, y: 263, w: 90, h: 18, confidence: 0.95, field: 'productCode', row: 1, page: 1 },
+      { x: 275, y: 263, w: 70, h: 18, confidence: 0.85, field: 'unitPrice', row: 1, page: 1 },
+      { x: 355, y: 263, w: 40, h: 18, confidence: 0.98, field: 'quantity', row: 1, page: 1 },
+      { x: 435, y: 263, w: 80, h: 18, confidence: 0.93, field: 'amount', row: 1, page: 1 },
+      // 明細3行目
+      { x: 55, y: 288, w: 110, h: 18, confidence: 0.78, field: 'productName', row: 2, page: 1 },
+      { x: 175, y: 288, w: 90, h: 18, confidence: 0.65, field: 'productCode', row: 2, page: 1 },
+      { x: 275, y: 288, w: 70, h: 18, confidence: 0.90, field: 'unitPrice', row: 2, page: 1 },
+      { x: 355, y: 288, w: 40, h: 18, confidence: 0.85, field: 'quantity', row: 2, page: 1 },
+      { x: 435, y: 288, w: 80, h: 18, confidence: 0.88, field: 'amount', row: 2, page: 1 },
+      // ページ2 明細4行目
+      { x: 55, y: 238, w: 110, h: 18, confidence: 0.99, field: 'productName', row: 4, page: 2 },
+      { x: 175, y: 238, w: 90, h: 18, confidence: 0.97, field: 'productCode', row: 4, page: 2 },
+      { x: 275, y: 238, w: 70, h: 18, confidence: 0.94, field: 'unitPrice', row: 4, page: 2 },
+      { x: 355, y: 238, w: 40, h: 18, confidence: 0.99, field: 'quantity', row: 4, page: 2 },
+      { x: 435, y: 238, w: 80, h: 18, confidence: 0.96, field: 'amount', row: 4, page: 2 }
     ];
 
     // ==========================================
@@ -1476,21 +1503,31 @@
 
     function renderHighlights() {
       const layer = document.getElementById('highlightLayer');
+      const viewport = document.getElementById('pdfViewport');
       layer.innerHTML = '';
 
+      // 実際のスケールを計算
+      const baseWidth = 595;
+      const baseHeight = 842;
+      const viewportWidth = viewport.clientWidth - 40;
+      const viewportHeight = viewport.clientHeight - 40;
+      const fitScale = Math.min(viewportWidth / baseWidth, viewportHeight / baseHeight, 1.5);
+      const actualZoom = zoom * fitScale;
+
       highlightBoxes.forEach((box, idx) => {
-        if ((currentPage === 1 && box.row < 3) || (currentPage === 2 && box.row >= 3)) {
+        // 現在のページに対応するハイライトのみ表示
+        if (box.page === currentPage) {
           const div = document.createElement('div');
           div.className = 'highlight-box';
           if (box.confidence >= 0.9) div.classList.add('high');
           else if (box.confidence >= 0.7) div.classList.add('mid');
           else div.classList.add('low');
 
-          div.style.left = (box.x * zoom) + 'px';
-          div.style.top = (box.y * zoom) + 'px';
-          div.style.width = (box.w * zoom) + 'px';
-          div.style.height = (box.h * zoom) + 'px';
-          div.dataset.row = box.row;
+          div.style.left = (box.x * actualZoom) + 'px';
+          div.style.top = (box.y * actualZoom) + 'px';
+          div.style.width = (box.w * actualZoom) + 'px';
+          div.style.height = (box.h * actualZoom) + 'px';
+          if (box.row !== undefined) div.dataset.row = box.row;
           div.dataset.field = box.field;
           layer.appendChild(div);
         }
