@@ -20,9 +20,6 @@
       --mustard-light: #fff8e1;
       --bengara: #8b2500;
       --bengara-light: #ffebee;
-      --confidence-high: #4caf50;
-      --confidence-mid: #ff9800;
-      --confidence-low: #f44336;
       --shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
 
@@ -391,21 +388,6 @@
       background: rgba(0, 128, 128, 0.2);
       pointer-events: none;
       display: none;
-    }
-
-    /* 確信度ハイライト（スマートOCR風） */
-    .highlight-box {
-      position: absolute;
-      pointer-events: none;
-    }
-
-    .highlight-box.high { background: rgba(173, 216, 255, 0.6); }
-    .highlight-box.mid { background: rgba(255, 255, 180, 0.7); }
-    .highlight-box.low { background: rgba(255, 200, 200, 0.7); }
-    .highlight-box.selected {
-      outline: 3px solid var(--teal);
-      outline-offset: -1px;
-      box-shadow: 0 0 8px rgba(0,128,128,0.5);
     }
 
     /* 右パネル */
@@ -951,7 +933,6 @@
                 <canvas id="pdfCanvas"></canvas>
                 <canvas id="drawCanvas"></canvas>
                 <div class="ocr-selection" id="ocrSelection"></div>
-                <div id="highlightLayer"></div>
               </div>
             </div>
           </div>
@@ -1091,12 +1072,12 @@
     ];
 
     let detailRows = [
-      { productName: 'ノートPC', productCode: 'P001', unitPrice: '98000', quantity: '1', amount: '98000', confidence: { productName: 0.95, productCode: 0.88, unitPrice: 0.72 }, original: {} },
-      { productName: 'モニター', productCode: 'P002', unitPrice: '35000', quantity: '2', amount: '70000', confidence: { productName: 0.92, productCode: 0.95, unitPrice: 0.85 }, original: {} },
-      { productName: 'キーボード', productCode: 'P003', unitPrice: '8000', quantity: '3', amount: '24000', confidence: { productName: 0.78, productCode: 0.65, unitPrice: 0.90 }, original: {} },
+      { productName: 'ノートPC', productCode: 'P001', unitPrice: '98000', quantity: '1', amount: '98000', original: {} },
+      { productName: 'モニター', productCode: 'P002', unitPrice: '35000', quantity: '2', amount: '70000', original: {} },
+      { productName: 'キーボード', productCode: 'P003', unitPrice: '8000', quantity: '3', amount: '24000', original: {} },
       { pageBreak: true },
-      { productName: 'マウス', productCode: 'P004', unitPrice: '3000', quantity: '5', amount: '15000', confidence: { productName: 0.99, productCode: 0.97, unitPrice: 0.94 }, original: {} },
-      { productName: '', productCode: '', unitPrice: '', quantity: '', amount: '', confidence: {}, original: {} }
+      { productName: 'マウス', productCode: 'P004', unitPrice: '3000', quantity: '5', amount: '15000', original: {} },
+      { productName: '', productCode: '', unitPrice: '', quantity: '', amount: '', original: {} }
     ];
 
     let selectedCells = [];
@@ -1110,39 +1091,6 @@
     // Undo/Redo
     let undoStack = [];
     let redoStack = [];
-
-    // 確信度ハイライトデータ（スマートOCR風）
-    let highlightBoxes = [
-      // ヘッダー部分
-      { x: 50, y: 92, w: 150, h: 18, confidence: 0.95, field: 'partner', page: 1 },
-      { x: 420, y: 32, w: 120, h: 16, confidence: 0.92, field: 'date', page: 1 },
-      { x: 420, y: 48, w: 140, h: 16, confidence: 0.88, field: 'invoiceNo', page: 1 },
-      { x: 50, y: 162, w: 180, h: 18, confidence: 0.75, field: 'amount', page: 1 },
-      // 明細1行目
-      { x: 55, y: 238, w: 110, h: 18, confidence: 0.95, field: 'productName', row: 0, page: 1 },
-      { x: 175, y: 238, w: 90, h: 18, confidence: 0.88, field: 'productCode', row: 0, page: 1 },
-      { x: 275, y: 238, w: 70, h: 18, confidence: 0.72, field: 'unitPrice', row: 0, page: 1 },
-      { x: 355, y: 238, w: 40, h: 18, confidence: 0.95, field: 'quantity', row: 0, page: 1 },
-      { x: 435, y: 238, w: 80, h: 18, confidence: 0.90, field: 'amount', row: 0, page: 1 },
-      // 明細2行目
-      { x: 55, y: 263, w: 110, h: 18, confidence: 0.92, field: 'productName', row: 1, page: 1 },
-      { x: 175, y: 263, w: 90, h: 18, confidence: 0.95, field: 'productCode', row: 1, page: 1 },
-      { x: 275, y: 263, w: 70, h: 18, confidence: 0.85, field: 'unitPrice', row: 1, page: 1 },
-      { x: 355, y: 263, w: 40, h: 18, confidence: 0.98, field: 'quantity', row: 1, page: 1 },
-      { x: 435, y: 263, w: 80, h: 18, confidence: 0.93, field: 'amount', row: 1, page: 1 },
-      // 明細3行目
-      { x: 55, y: 288, w: 110, h: 18, confidence: 0.78, field: 'productName', row: 2, page: 1 },
-      { x: 175, y: 288, w: 90, h: 18, confidence: 0.65, field: 'productCode', row: 2, page: 1 },
-      { x: 275, y: 288, w: 70, h: 18, confidence: 0.90, field: 'unitPrice', row: 2, page: 1 },
-      { x: 355, y: 288, w: 40, h: 18, confidence: 0.85, field: 'quantity', row: 2, page: 1 },
-      { x: 435, y: 288, w: 80, h: 18, confidence: 0.88, field: 'amount', row: 2, page: 1 },
-      // ページ2 明細4行目
-      { x: 55, y: 238, w: 110, h: 18, confidence: 0.99, field: 'productName', row: 4, page: 2 },
-      { x: 175, y: 238, w: 90, h: 18, confidence: 0.97, field: 'productCode', row: 4, page: 2 },
-      { x: 275, y: 238, w: 70, h: 18, confidence: 0.94, field: 'unitPrice', row: 4, page: 2 },
-      { x: 355, y: 238, w: 40, h: 18, confidence: 0.99, field: 'quantity', row: 4, page: 2 },
-      { x: 435, y: 238, w: 80, h: 18, confidence: 0.96, field: 'amount', row: 4, page: 2 }
-    ];
 
     // ==========================================
     // 初期化
@@ -1419,7 +1367,6 @@
       ctx.fillRect(0, 0, baseWidth, baseHeight);
 
       drawInvoice(ctx, currentPage);
-      renderHighlights();
       document.getElementById('pageInfo').textContent = `${currentPage} / ${totalPages}`;
       document.getElementById('zoomLevel').textContent = `${Math.round(zoom * 100)}%`;
     }
@@ -1497,39 +1444,6 @@
       ctx.fillText('請求書', 170, 40);
       ctx.font = '10px sans-serif';
       ctx.fillText(doc?.partner || '', 30, 70);
-    }
-
-    function renderHighlights() {
-      const layer = document.getElementById('highlightLayer');
-      const viewport = document.getElementById('pdfViewport');
-      layer.innerHTML = '';
-
-      // 実際のスケールを計算
-      const baseWidth = 595;
-      const baseHeight = 842;
-      const viewportWidth = viewport.clientWidth;
-      const viewportHeight = viewport.clientHeight;
-      const fitScale = Math.min(viewportWidth / baseWidth, viewportHeight / baseHeight, 2.0);
-      const actualZoom = zoom * fitScale;
-
-      highlightBoxes.forEach((box, idx) => {
-        // 現在のページに対応するハイライトのみ表示
-        if (box.page === currentPage) {
-          const div = document.createElement('div');
-          div.className = 'highlight-box';
-          if (box.confidence >= 0.9) div.classList.add('high');
-          else if (box.confidence >= 0.7) div.classList.add('mid');
-          else div.classList.add('low');
-
-          div.style.left = (box.x * actualZoom) + 'px';
-          div.style.top = (box.y * actualZoom) + 'px';
-          div.style.width = (box.w * actualZoom) + 'px';
-          div.style.height = (box.h * actualZoom) + 'px';
-          if (box.row !== undefined) div.dataset.row = box.row;
-          div.dataset.field = box.field;
-          layer.appendChild(div);
-        }
-      });
     }
 
     function prevPage() {
@@ -1757,7 +1671,6 @@
       }
 
       renderDetailTable();
-      highlightPdfArea(row, col);
     }
 
     let isDragging = false;
@@ -1841,15 +1754,6 @@
       }
     }
 
-    function highlightPdfArea(row, col) {
-      document.querySelectorAll('.highlight-box').forEach(box => {
-        box.classList.remove('selected');
-        if (parseInt(box.dataset.row) === row) {
-          box.classList.add('selected');
-        }
-      });
-    }
-
     function showCellTooltip(e, row, col) {
       const colDef = detailColumns[col];
       const value = detailRows[row]?.[colDef?.id] || '';
@@ -1873,7 +1777,7 @@
         return;
       }
       const row = Math.min(...selectedCells.map(c => c.row));
-      const newRow = { productName: '', productCode: '', unitPrice: '', quantity: '', amount: '', confidence: {}, original: {} };
+      const newRow = { productName: '', productCode: '', unitPrice: '', quantity: '', amount: '', original: {} };
       detailRows.splice(row, 0, newRow);
       saveUndoState();
       renderDetailTable();
@@ -1886,7 +1790,7 @@
         return;
       }
       const row = Math.max(...selectedCells.map(c => c.row));
-      const newRow = { productName: '', productCode: '', unitPrice: '', quantity: '', amount: '', confidence: {}, original: {} };
+      const newRow = { productName: '', productCode: '', unitPrice: '', quantity: '', amount: '', original: {} };
       detailRows.splice(row + 1, 0, newRow);
       saveUndoState();
       renderDetailTable();
