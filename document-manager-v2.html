@@ -367,12 +367,12 @@
       display: flex;
       justify-content: center;
       align-items: flex-start;
-      padding: 20px;
+      padding: 8px;
     }
 
     .canvas-container {
       position: relative;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     }
 
     #pdfCanvas {
@@ -411,7 +411,7 @@
 
     /* 右パネル */
     .edit-panel {
-      width: 450px;
+      width: 550px;
       background: var(--bg-white);
       border-left: 1px solid var(--border-color);
       display: flex;
@@ -1407,10 +1407,10 @@
       const baseWidth = 595;
       const baseHeight = 842;
 
-      // viewportサイズに合わせて自動スケール
-      const viewportWidth = viewport.clientWidth - 40; // padding分を引く
-      const viewportHeight = viewport.clientHeight - 40;
-      const fitScale = Math.min(viewportWidth / baseWidth, viewportHeight / baseHeight, 1.5);
+      // viewportサイズに合わせて自動スケール（余白最小）
+      const viewportWidth = viewport.clientWidth - 16;
+      const viewportHeight = viewport.clientHeight - 16;
+      const fitScale = Math.min(viewportWidth / baseWidth, viewportHeight / baseHeight, 2.0);
       const actualZoom = zoom * fitScale;
 
       pdfCanvas.width = baseWidth * actualZoom;
@@ -1508,12 +1508,12 @@
       const viewport = document.getElementById('pdfViewport');
       layer.innerHTML = '';
 
-      // 実際のスケールを計算
+      // 実際のスケールを計算（余白最小）
       const baseWidth = 595;
       const baseHeight = 842;
-      const viewportWidth = viewport.clientWidth - 40;
-      const viewportHeight = viewport.clientHeight - 40;
-      const fitScale = Math.min(viewportWidth / baseWidth, viewportHeight / baseHeight, 1.5);
+      const viewportWidth = viewport.clientWidth - 16;
+      const viewportHeight = viewport.clientHeight - 16;
+      const fitScale = Math.min(viewportWidth / baseWidth, viewportHeight / baseHeight, 2.0);
       const actualZoom = zoom * fitScale;
 
       highlightBoxes.forEach((box, idx) => {
@@ -2462,7 +2462,7 @@
     // リサイザー
     function setupResizers() {
       setupResizer('listResizer', 'previewArea', 'width', 200, 600);
-      setupResizer('previewResizer', 'editPanel', 'width', 300, 800, true);
+      setupResizer('previewResizer', 'editPanel', 'width', 400, 900, true);
 
       // ウィンドウリサイズ時にPDFを再描画
       window.addEventListener('resize', debounce(() => {
