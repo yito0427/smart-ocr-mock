@@ -367,12 +367,11 @@
       display: flex;
       justify-content: center;
       align-items: flex-start;
-      padding: 2px;
+      padding: 0;
     }
 
     .canvas-container {
       position: relative;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
     }
 
     #pdfCanvas {
@@ -1404,9 +1403,9 @@
       const baseWidth = 595;
       const baseHeight = 842;
 
-      // viewportサイズに合わせて自動スケール（余白なし）
-      const viewportWidth = viewport.clientWidth - 4;
-      const viewportHeight = viewport.clientHeight - 4;
+      // viewportサイズに合わせて自動スケール
+      const viewportWidth = viewport.clientWidth;
+      const viewportHeight = viewport.clientHeight;
       const fitScale = Math.min(viewportWidth / baseWidth, viewportHeight / baseHeight, 2.0);
       const actualZoom = zoom * fitScale;
 
@@ -1505,11 +1504,11 @@
       const viewport = document.getElementById('pdfViewport');
       layer.innerHTML = '';
 
-      // 実際のスケールを計算（余白なし）
+      // 実際のスケールを計算
       const baseWidth = 595;
       const baseHeight = 842;
-      const viewportWidth = viewport.clientWidth - 4;
-      const viewportHeight = viewport.clientHeight - 4;
+      const viewportWidth = viewport.clientWidth;
+      const viewportHeight = viewport.clientHeight;
       const fitScale = Math.min(viewportWidth / baseWidth, viewportHeight / baseHeight, 2.0);
       const actualZoom = zoom * fitScale;
 
