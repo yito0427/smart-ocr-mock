@@ -390,6 +390,21 @@
       display: none;
     }
 
+    #highlightLayer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+    }
+
+    .cell-highlight {
+      position: absolute;
+      background: rgba(0, 128, 128, 0.25);
+      border: 2px solid var(--teal);
+      border-radius: 2px;
+      pointer-events: none;
+    }
+
     /* 右パネル */
     .edit-panel {
       width: 720px;
@@ -933,6 +948,7 @@
                 <canvas id="pdfCanvas"></canvas>
                 <canvas id="drawCanvas"></canvas>
                 <div class="ocr-selection" id="ocrSelection"></div>
+                <div id="highlightLayer"></div>
               </div>
             </div>
           </div>
@@ -1072,16 +1088,26 @@
     ];
 
     let detailRows = [
-      { productName: 'ノートPC', productCode: 'P001', unitPrice: '98000', quantity: '1', amount: '98000', original: {} },
-      { productName: 'モニター', productCode: 'P002', unitPrice: '35000', quantity: '2', amount: '70000', original: {} },
-      { productName: 'キーボード', productCode: 'P003', unitPrice: '8000', quantity: '3', amount: '24000', original: {} },
+      { productName: 'ノートPC', productCode: 'P001', unitPrice: '98000', quantity: '1', amount: '98000', page: 1, pdfY: 238, original: {} },
+      { productName: 'モニター', productCode: 'P002', unitPrice: '35000', quantity: '2', amount: '70000', page: 1, pdfY: 263, original: {} },
+      { productName: 'キーボード', productCode: 'P003', unitPrice: '8000', quantity: '3', amount: '24000', page: 1, pdfY: 288, original: {} },
       { pageBreak: true },
-      { productName: 'マウス', productCode: 'P004', unitPrice: '3000', quantity: '5', amount: '15000', original: {} },
-      { productName: '', productCode: '', unitPrice: '', quantity: '', amount: '', original: {} }
+      { productName: 'マウス', productCode: 'P004', unitPrice: '3000', quantity: '5', amount: '15000', page: 2, pdfY: 238, original: {} },
+      { productName: '', productCode: '', unitPrice: '', quantity: '', amount: '', page: 2, pdfY: 263, original: {} }
     ];
+
+    // 列ごとのPDF座標マッピング
+    const columnPdfPositions = {
+      productName: { x: 55, w: 110 },
+      productCode: { x: 175, w: 90 },
+      unitPrice: { x: 275, w: 70 },
+      quantity: { x: 355, w: 40 },
+      amount: { x: 435, w: 80 }
+    };
 
     let selectedCells = [];
     let selectionAnchor = null;
+    let currentHighlight = null; // 現在のハイライト情報
 
     // OCR
     let isOcrMode = false;
@@ -1671,6 +1697,54 @@
       }
 
       renderDetailTable();
+      highlightPdfCell(row, col);
+    }
+
+    // PDFプレビュー上のセルハイライト
+    function highlightPdfCell(row, col) {
+      const rowData = detailRows[row];
+      if (!rowData || rowData.pageBreak) return;
+
+      const colDef = detailColumns[col];
+      if (!colDef) return;
+
+      const colPos = columnPdfPositions[colDef.id];
+      if (!colPos) return;
+
+      // ページ切り替え
+      if (rowData.page && rowData.page !== currentPage) {
+        currentPage = rowData.page;
+        renderPdfCanvas();
+      }
+
+      // ハイライト表示
+      renderCellHighlight(colPos.x, rowData.pdfY, colPos.w, 18);
+    }
+
+    function renderCellHighlight(x, y, w, h) {
+      const layer = document.getElementById('highlightLayer');
+      const viewport = document.getElementById('pdfViewport');
+      layer.innerHTML = '';
+
+      const baseWidth = 595;
+      const baseHeight = 842;
+      const viewportWidth = viewport.clientWidth;
+      const viewportHeight = viewport.clientHeight;
+      const fitScale = Math.min(viewportWidth / baseWidth, viewportHeight / baseHeight, 2.0);
+      const actualZoom = zoom * fitScale;
+
+      const div = document.createElement('div');
+      div.className = 'cell-highlight';
+      div.style.left = (x * actualZoom) + 'px';
+      div.style.top = (y * actualZoom) + 'px';
+      div.style.width = (w * actualZoom) + 'px';
+      div.style.height = (h * actualZoom) + 'px';
+      layer.appendChild(div);
+    }
+
+    function clearCellHighlight() {
+      const layer = document.getElementById('highlightLayer');
+      if (layer) layer.innerHTML = '';
     }
 
     let isDragging = false;
@@ -1777,7 +1851,8 @@
         return;
       }
       const row = Math.min(...selectedCells.map(c => c.row));
-      const newRow = { productName: '', productCode: '', unitPrice: '', quantity: '', amount: '', original: {} };
+      const refRow = detailRows[row] || {};
+      const newRow = { productName: '', productCode: '', unitPrice: '', quantity: '', amount: '', page: refRow.page || 1, pdfY: (refRow.pdfY || 238), original: {} };
       detailRows.splice(row, 0, newRow);
       saveUndoState();
       renderDetailTable();
@@ -1790,7 +1865,8 @@
         return;
       }
       const row = Math.max(...selectedCells.map(c => c.row));
-      const newRow = { productName: '', productCode: '', unitPrice: '', quantity: '', amount: '', original: {} };
+      const refRow = detailRows[row] || {};
+      const newRow = { productName: '', productCode: '', unitPrice: '', quantity: '', amount: '', page: refRow.page || 1, pdfY: (refRow.pdfY || 238) + 25, original: {} };
       detailRows.splice(row + 1, 0, newRow);
       saveUndoState();
       renderDetailTable();
