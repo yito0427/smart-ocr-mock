@@ -349,7 +349,7 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      min-width: 300px;
+      min-width: 250px;
     }
 
     .pdf-controls {
@@ -584,7 +584,7 @@
 
     .detail-table {
       border-collapse: separate;
-      border-spacing: 6px 4px;
+      border-spacing: 6px 2px;
       font-size: 13px;
       min-width: 100%;
     }
@@ -594,14 +594,11 @@
       padding: 0;
       position: relative;
       white-space: nowrap;
+      vertical-align: top;
     }
 
-    .detail-table th {
-      background: transparent;
-      color: var(--text-secondary);
-      font-weight: 500;
-      font-size: 12px;
-      user-select: none;
+    .detail-table thead {
+      display: none;
     }
 
     .detail-table .row-number {
@@ -611,38 +608,43 @@
       min-width: 28px;
       text-align: center;
       font-size: 11px;
-      padding: 8px 2px;
-      vertical-align: middle;
+      padding: 24px 2px 8px 2px;
+      vertical-align: top;
     }
-
-    .detail-table thead .row-number {
-      color: var(--text-secondary);
-    }
-
-    .detail-table .header-cell {
-      padding: 6px 8px;
-      min-width: 80px;
-      cursor: pointer;
-      position: relative;
-      text-align: left;
-    }
-
-    .detail-table .header-cell:hover { color: var(--teal); }
-
-    .col-resizer {
-      position: absolute;
-      right: 0;
-      top: 0;
-      bottom: 0;
-      width: 5px;
-      cursor: col-resize;
-      background: transparent;
-    }
-
-    .col-resizer:hover { background: var(--teal); }
 
     .detail-table td {
       background: transparent;
+    }
+
+    .cell-wrapper {
+      position: relative;
+    }
+
+    .cell-label {
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-bottom: 2px;
+      padding-left: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .cell-label .col-resizer {
+      width: 12px;
+      height: 12px;
+      cursor: col-resize;
+      opacity: 0;
+      transition: opacity 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: var(--text-secondary);
+    }
+
+    .cell-wrapper:hover .col-resizer {
+      opacity: 1;
     }
 
     .cell-content {
@@ -934,7 +936,7 @@
           </div>
 
           <!-- 中央プレビュー -->
-          <div class="preview-panel">
+          <div class="preview-panel" id="previewPanel">
             <div class="pdf-controls">
               <button class="btn btn-secondary" onclick="prevPage()">◀ 前へ</button>
               <span id="pageInfo">1 / 2</span>
@@ -954,7 +956,7 @@
             </div>
           </div>
 
-          <div class="resizer" id="editResizer"></div>
+          <div class="resizer" id="previewResizer"></div>
 
           <!-- 右パネル -->
           <div class="edit-panel" id="editPanel">
@@ -1370,16 +1372,24 @@
     function renderPdfCanvas() {
       const pdfCanvas = document.getElementById('pdfCanvas');
       const drawCanvas = document.getElementById('drawCanvas');
+      const viewport = document.getElementById('pdfViewport');
       const ctx = pdfCanvas.getContext('2d');
 
       const baseWidth = 595;
       const baseHeight = 842;
-      pdfCanvas.width = baseWidth * zoom;
-      pdfCanvas.height = baseHeight * zoom;
+
+      // viewportサイズに合わせて自動スケール
+      const viewportWidth = viewport.clientWidth - 40; // padding分を引く
+      const viewportHeight = viewport.clientHeight - 40;
+      const fitScale = Math.min(viewportWidth / baseWidth, viewportHeight / baseHeight, 1.5);
+      const actualZoom = zoom * fitScale;
+
+      pdfCanvas.width = baseWidth * actualZoom;
+      pdfCanvas.height = baseHeight * actualZoom;
       drawCanvas.width = pdfCanvas.width;
       drawCanvas.height = pdfCanvas.height;
 
-      ctx.scale(zoom, zoom);
+      ctx.scale(actualZoom, actualZoom);
       ctx.fillStyle = 'white';
       ctx.fillRect(0, 0, baseWidth, baseHeight);
 
@@ -1635,18 +1645,10 @@
       const thead = document.getElementById('detailTableHead');
       const tbody = document.getElementById('detailTableBody');
 
-      // ヘッダー
+      // ヘッダー（非表示だが列幅管理用に残す）
       let headerHtml = '<tr><th class="row-number">#</th>';
       detailColumns.forEach((col, idx) => {
-        headerHtml += `<th class="header-cell" style="width:${col.width}px;min-width:${col.width}px;"
-                          draggable="true"
-                          ondragstart="dragColumn(event,${idx})"
-                          ondragover="event.preventDefault()"
-                          ondrop="dropColumn(event,${idx})"
-                          oncontextmenu="showColumnMenu(event,${idx})">
-                        ${col.name}${col.formula ? ' (自動)' : ''}
-                        <div class="col-resizer" onmousedown="startColResize(event,${idx})"></div>
-                      </th>`;
+        headerHtml += `<th style="width:${col.width}px;min-width:${col.width}px;"></th>`;
       });
       headerHtml += '</tr>';
       thead.innerHTML = headerHtml;
@@ -1672,16 +1674,23 @@
             selectedCells.some(c => c.row === rowIdx && c.col === colIdx) ? 'selected' : ''
           ].filter(Boolean).join(' ');
 
-          bodyHtml += `<td class="${cellClass}" data-row="${rowIdx}" data-col="${colIdx}"
+          bodyHtml += `<td class="${cellClass}" data-row="${rowIdx}" data-col="${colIdx}" style="width:${col.width}px;min-width:${col.width}px;"
                           onclick="handleCellClick(event,${rowIdx},${colIdx})"
                           onmousedown="handleCellMouseDown(event,${rowIdx},${colIdx})"
                           onmouseover="handleCellMouseOver(event,${rowIdx},${colIdx})"
                           onmouseenter="showCellTooltip(event,${rowIdx},${colIdx})"
-                          onmouseleave="hideCellTooltip()">
-                        <div class="cell-content"
-                             contenteditable="${!isFormula}"
-                             oninput="handleCellInput(event,${rowIdx},'${col.id}')"
-                             onblur="handleCellBlur(event,${rowIdx},'${col.id}')">${value}</div>
+                          onmouseleave="hideCellTooltip()"
+                          oncontextmenu="showColumnMenu(event,${colIdx})">
+                        <div class="cell-wrapper">
+                          <div class="cell-label">
+                            <span>${col.name}</span>
+                            <span class="col-resizer" onmousedown="startColResize(event,${colIdx})">⋮</span>
+                          </div>
+                          <div class="cell-content"
+                               contenteditable="${!isFormula}"
+                               oninput="handleCellInput(event,${rowIdx},'${col.id}')"
+                               onblur="handleCellBlur(event,${rowIdx},'${col.id}')">${value}</div>
+                        </div>
                       </td>`;
         });
         bodyHtml += '</tr>';
@@ -1926,9 +1935,12 @@
 
     function startColResize(e, idx) {
       e.stopPropagation();
+      e.preventDefault();
       resizeColIdx = idx;
       resizeStartX = e.pageX;
       resizeStartWidth = detailColumns[idx].width;
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
       document.addEventListener('mousemove', doColResize);
       document.addEventListener('mouseup', stopColResize);
     }
@@ -1936,13 +1948,15 @@
     function doColResize(e) {
       if (resizeColIdx !== null) {
         const diff = e.pageX - resizeStartX;
-        detailColumns[resizeColIdx].width = Math.max(50, resizeStartWidth + diff);
+        detailColumns[resizeColIdx].width = Math.max(60, resizeStartWidth + diff);
         renderDetailTable();
       }
     }
 
     function stopColResize() {
       resizeColIdx = null;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
       document.removeEventListener('mousemove', doColResize);
       document.removeEventListener('mouseup', stopColResize);
     }
@@ -2407,10 +2421,25 @@
     // リサイザー
     function setupResizers() {
       setupResizer('listResizer', 'previewArea', 'width', 200, 600);
-      setupResizer('editResizer', 'editPanel', 'width', 300, 700);
+      setupResizer('previewResizer', 'editPanel', 'width', 300, 800, true);
+
+      // ウィンドウリサイズ時にPDFを再描画
+      window.addEventListener('resize', debounce(() => {
+        if (currentScreen === 'edit') {
+          renderPdfCanvas();
+        }
+      }, 200));
     }
 
-    function setupResizer(resizerId, targetId, prop, min, max) {
+    function debounce(func, wait) {
+      let timeout;
+      return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+      };
+    }
+
+    function setupResizer(resizerId, targetId, prop, min, max, rerenderPdf = false) {
       const resizer = document.getElementById(resizerId);
       const target = document.getElementById(targetId);
       if (!resizer || !target) return;
@@ -2420,6 +2449,8 @@
       resizer.addEventListener('mousedown', (e) => {
         startX = e.clientX;
         startWidth = target.offsetWidth;
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
         document.addEventListener('mousemove', resize);
         document.addEventListener('mouseup', stopResize);
       });
@@ -2431,8 +2462,13 @@
       }
 
       function stopResize() {
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
         document.removeEventListener('mousemove', resize);
         document.removeEventListener('mouseup', stopResize);
+        if (rerenderPdf && currentScreen === 'edit') {
+          renderPdfCanvas();
+        }
       }
     }
 
