@@ -610,7 +610,12 @@
       min-width: 28px;
       text-align: center;
       font-size: 11px;
-      padding: 24px 2px 8px 2px;
+      padding: 8px 2px;
+      vertical-align: middle;
+    }
+
+    .detail-table .first-row .row-number {
+      padding-top: 24px;
       vertical-align: top;
     }
 
@@ -1703,7 +1708,7 @@
           return;
         }
 
-        bodyHtml += '<tr>';
+        bodyHtml += `<tr class="${rowNum === 1 ? 'first-row' : ''}">`;
         bodyHtml += `<td class="row-number">${rowNum}</td>`;
         detailColumns.forEach((col, colIdx) => {
           const value = row[col.id] || '';
@@ -1723,10 +1728,10 @@
                           onmouseleave="hideCellTooltip()"
                           oncontextmenu="showColumnMenu(event,${colIdx})">
                         <div class="cell-wrapper">
-                          <div class="cell-label">
+                          ${rowNum === 1 ? `<div class="cell-label">
                             <span>${col.name}</span>
                             <span class="col-resizer" onmousedown="startColResize(event,${colIdx})">⋮</span>
-                          </div>
+                          </div>` : ''}
                           <div class="cell-content"
                                contenteditable="${!isFormula}"
                                oninput="handleCellInput(event,${rowIdx},'${col.id}')"
