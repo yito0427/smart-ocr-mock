@@ -1753,11 +1753,18 @@
         renderPdfCanvas();
       }
 
-      // ハイライト表示とスクロール
+      // ハイライト表示とスクロール（描画完了後に実行）
       const cellX = colPos.x;
       const cellY = rowData.pdfY;
-      renderCellHighlight(cellX, cellY, colPos.w, 18);
-      scrollToPdfCell(cellX, cellY, colPos.w, 18);
+      const cellW = colPos.w;
+      const cellH = 18;
+
+      requestAnimationFrame(() => {
+        renderCellHighlight(cellX, cellY, cellW, cellH);
+        requestAnimationFrame(() => {
+          scrollToPdfCell(cellX, cellY, cellW, cellH);
+        });
+      });
     }
 
     function renderCellHighlight(x, y, w, h) {
