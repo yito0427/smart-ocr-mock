@@ -970,6 +970,7 @@
               <button class="btn btn-secondary" onclick="zoomOut()">−</button>
               <span id="zoomLevel">100%</span>
               <button class="btn btn-secondary" onclick="zoomIn()">+</button>
+              <button class="btn btn-secondary" onclick="resetPdfView()" title="全体表示に戻す" style="margin-left:8px;">⊡ 全体</button>
             </div>
             <div class="pdf-viewport" id="pdfViewport">
               <div class="canvas-container" id="canvasContainer">
@@ -1728,7 +1729,7 @@
       highlightPdfCell(row, col);
     }
 
-    // PDFプレビュー上のセルハイライト
+    // PDFプレビュー上のセルハイライトと拡大フォーカス
     function highlightPdfCell(row, col) {
       const rowData = detailRows[row];
       if (!rowData || rowData.pageBreak) return;
@@ -1739,14 +1740,24 @@
       const colPos = columnPdfPositions[colDef.id];
       if (!colPos) return;
 
-      // ページ切り替え
-      if (rowData.page && rowData.page !== currentPage) {
+      // ページ切り替えが必要な場合
+      const needPageSwitch = rowData.page && rowData.page !== currentPage;
+      if (needPageSwitch) {
         currentPage = rowData.page;
+      }
+
+      // 確認しやすいズームレベルに設定（1.8倍）
+      const detailZoom = 1.8;
+      if (zoom !== detailZoom || needPageSwitch) {
+        zoom = detailZoom;
         renderPdfCanvas();
       }
 
-      // ハイライト表示
-      renderCellHighlight(colPos.x, rowData.pdfY, colPos.w, 18);
+      // ハイライト表示とスクロール
+      const cellX = colPos.x;
+      const cellY = rowData.pdfY;
+      renderCellHighlight(cellX, cellY, colPos.w, 18);
+      scrollToPdfCell(cellX, cellY, colPos.w, 18);
     }
 
     function renderCellHighlight(x, y, w, h) {
@@ -1770,9 +1781,42 @@
       layer.appendChild(div);
     }
 
+    // PDFビューポートを該当セルにスクロール
+    function scrollToPdfCell(x, y, w, h) {
+      const viewport = document.getElementById('pdfViewport');
+      const baseWidth = 595;
+      const baseHeight = 842;
+      const viewportWidth = viewport.clientWidth;
+      const viewportHeight = viewport.clientHeight;
+      const fitScale = Math.min(viewportWidth / baseWidth, viewportHeight / baseHeight, 2.0);
+      const actualZoom = zoom * fitScale;
+
+      // セルの中心座標を計算
+      const cellCenterX = (x + w / 2) * actualZoom;
+      const cellCenterY = (y + h / 2) * actualZoom;
+
+      // ビューポートの中心にセルが来るようスクロール
+      const scrollX = cellCenterX - viewportWidth / 2;
+      const scrollY = cellCenterY - viewportHeight / 2;
+
+      viewport.scrollTo({
+        left: Math.max(0, scrollX),
+        top: Math.max(0, scrollY),
+        behavior: 'smooth'
+      });
+    }
+
     function clearCellHighlight() {
       const layer = document.getElementById('highlightLayer');
       if (layer) layer.innerHTML = '';
+    }
+
+    // 全体表示に戻す
+    function resetPdfView() {
+      zoom = 1.0;
+      clearCellHighlight();
+      renderPdfCanvas();
+      document.getElementById('pdfViewport').scrollTo({ top: 0, left: 0, behavior: 'smooth' });
     }
 
     let isDragging = false;
