@@ -615,16 +615,44 @@
 
     .detail-table thead th .col-resizer {
       position: absolute;
-      right: 0;
+      right: -4px;
       top: 0;
       bottom: 0;
-      width: 6px;
+      width: 9px;
       cursor: col-resize;
       background: transparent;
+      z-index: 10;
     }
 
-    .detail-table thead th .col-resizer:hover {
+    .detail-table thead th .col-resizer::after {
+      content: '';
+      position: absolute;
+      right: 4px;
+      top: 25%;
+      bottom: 25%;
+      width: 1px;
+      background: #ccc;
+      transition: all 0.15s;
+    }
+
+    .detail-table thead th .col-resizer:hover::after {
+      right: 3px;
+      width: 3px;
       background: var(--teal);
+      border-radius: 2px;
+    }
+
+    .detail-table thead th:last-child .col-resizer {
+      display: none;
+    }
+
+    body.col-resizing .detail-table thead th .col-resizer::after {
+      width: 3px;
+      background: var(--teal);
+    }
+
+    body.col-resizing * {
+      cursor: col-resize !important;
     }
 
     .detail-table .row-number {
@@ -1625,7 +1653,7 @@
       detailColumns.forEach((col, idx) => {
         headerHtml += `<th style="width:${col.width}px;min-width:${col.width}px;">
           ${col.name}
-          <span class="col-resizer" onmousedown="startColResize(event,${idx})"></span>
+          <span class="col-resizer" onmousedown="startColResize(event,${idx})" ondblclick="autoFitColumn(${idx})" title="ダブルクリックで自動調整"></span>
         </th>`;
       });
       headerHtml += '</tr>';
@@ -1955,6 +1983,10 @@
       resizeStartWidth = detailColumns[idx].width;
       document.body.style.cursor = 'col-resize';
       document.body.style.userSelect = 'none';
+
+      // ドラッグ中のビジュアルフィードバック
+      document.body.classList.add('col-resizing');
+
       document.addEventListener('mousemove', doColResize);
       document.addEventListener('mouseup', stopColResize);
     }
@@ -1962,7 +1994,7 @@
     function doColResize(e) {
       if (resizeColIdx !== null) {
         const diff = e.pageX - resizeStartX;
-        detailColumns[resizeColIdx].width = Math.max(60, resizeStartWidth + diff);
+        detailColumns[resizeColIdx].width = Math.max(50, resizeStartWidth + diff);
         renderDetailTable();
       }
     }
@@ -1971,8 +2003,25 @@
       resizeColIdx = null;
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
+      document.body.classList.remove('col-resizing');
       document.removeEventListener('mousemove', doColResize);
       document.removeEventListener('mouseup', stopColResize);
+    }
+
+    // ダブルクリックで列幅を自動調整
+    function autoFitColumn(idx) {
+      const colId = detailColumns[idx].id;
+      let maxWidth = detailColumns[idx].name.length * 12 + 24; // ヘッダー幅
+
+      detailRows.forEach(row => {
+        if (row.pageBreak) return;
+        const val = String(row[colId] || '');
+        const width = val.length * 10 + 24;
+        if (width > maxWidth) maxWidth = width;
+      });
+
+      detailColumns[idx].width = Math.max(50, Math.min(300, maxWidth));
+      renderDetailTable();
     }
 
     function addPageBreak() {
@@ -2459,6 +2508,7 @@
       if (!resizer || !target) return;
 
       let startX, startWidth;
+      let rafId = null;
 
       resizer.addEventListener('mousedown', (e) => {
         startX = e.clientX;
@@ -2473,6 +2523,15 @@
         const diff = startX - e.clientX;
         const newWidth = Math.min(max, Math.max(min, startWidth + diff));
         target.style.width = newWidth + 'px';
+
+        // PDFをリアルタイムでリサイズ（requestAnimationFrameで最適化）
+        if (rerenderPdf && currentScreen === 'edit') {
+          if (rafId) cancelAnimationFrame(rafId);
+          rafId = requestAnimationFrame(() => {
+            renderPdfCanvas();
+            rafId = null;
+          });
+        }
       }
 
       function stopResize() {
@@ -2480,6 +2539,7 @@
         document.body.style.userSelect = '';
         document.removeEventListener('mousemove', resize);
         document.removeEventListener('mouseup', stopResize);
+        if (rafId) cancelAnimationFrame(rafId);
         if (rerenderPdf && currentScreen === 'edit') {
           renderPdfCanvas();
         }
