@@ -1409,7 +1409,7 @@
       // viewportサイズに合わせて自動スケール
       const viewportWidth = viewport.clientWidth;
       const viewportHeight = viewport.clientHeight;
-      const fitScale = Math.min(viewportWidth / baseWidth, viewportHeight / baseHeight, 2.0);
+      const fitScale = Math.min(viewportWidth / baseWidth, viewportHeight / baseHeight, 3.0);
       const actualZoom = zoom * fitScale;
 
       pdfCanvas.width = baseWidth * actualZoom;
@@ -1746,8 +1746,8 @@
         currentPage = rowData.page;
       }
 
-      // 確認しやすいズームレベルに設定（1.8倍）
-      const detailZoom = 1.8;
+      // 確認しやすいズームレベルに設定（2.5倍）
+      const detailZoom = 2.5;
       if (zoom !== detailZoom || needPageSwitch) {
         zoom = detailZoom;
         renderPdfCanvas();
@@ -1776,7 +1776,7 @@
       const baseHeight = 842;
       const viewportWidth = viewport.clientWidth;
       const viewportHeight = viewport.clientHeight;
-      const fitScale = Math.min(viewportWidth / baseWidth, viewportHeight / baseHeight, 2.0);
+      const fitScale = Math.min(viewportWidth / baseWidth, viewportHeight / baseHeight, 3.0);
       const actualZoom = zoom * fitScale;
 
       const div = document.createElement('div');
@@ -1795,7 +1795,7 @@
       const baseHeight = 842;
       const viewportWidth = viewport.clientWidth;
       const viewportHeight = viewport.clientHeight;
-      const fitScale = Math.min(viewportWidth / baseWidth, viewportHeight / baseHeight, 2.0);
+      const fitScale = Math.min(viewportWidth / baseWidth, viewportHeight / baseHeight, 3.0);
       const actualZoom = zoom * fitScale;
 
       // セルの中心座標を計算
