@@ -1117,21 +1117,21 @@
     ];
 
     let detailRows = [
-      { productName: 'ノートPC', productCode: 'P001', unitPrice: '98000', quantity: '1', amount: '98000', page: 1, pdfY: 238, original: {} },
-      { productName: 'モニター', productCode: 'P002', unitPrice: '35000', quantity: '2', amount: '70000', page: 1, pdfY: 263, original: {} },
-      { productName: 'キーボード', productCode: 'P003', unitPrice: '8000', quantity: '3', amount: '24000', page: 1, pdfY: 288, original: {} },
+      { productName: 'ノートPC', productCode: 'P001', unitPrice: '98000', quantity: '1', amount: '98000', page: 1, pdfY: 245, original: {}, ocrRegions: {} },
+      { productName: 'モニター', productCode: 'P002', unitPrice: '35000', quantity: '2', amount: '70000', page: 1, pdfY: 270, original: {}, ocrRegions: {} },
+      { productName: 'キーボード', productCode: 'P003', unitPrice: '8000', quantity: '3', amount: '24000', page: 1, pdfY: 295, original: {}, ocrRegions: {} },
       { pageBreak: true },
-      { productName: 'マウス', productCode: 'P004', unitPrice: '3000', quantity: '5', amount: '15000', page: 2, pdfY: 238, original: {} },
-      { productName: '', productCode: '', unitPrice: '', quantity: '', amount: '', page: 2, pdfY: 263, original: {} }
+      { productName: 'マウス', productCode: 'P004', unitPrice: '3000', quantity: '5', amount: '15000', page: 2, pdfY: 245, original: {}, ocrRegions: {} },
+      { productName: '', productCode: '', unitPrice: '', quantity: '', amount: '', page: 2, pdfY: 270, original: {}, ocrRegions: {} }
     ];
 
-    // 列ごとのPDF座標マッピング
+    // 列ごとのPDF座標マッピング（デフォルト値）
     const columnPdfPositions = {
-      productName: { x: 55, w: 110 },
-      productCode: { x: 175, w: 90 },
-      unitPrice: { x: 275, w: 70 },
-      quantity: { x: 355, w: 40 },
-      amount: { x: 435, w: 80 }
+      productName: { x: 60, w: 110 },
+      productCode: { x: 180, w: 90 },
+      unitPrice: { x: 280, w: 70 },
+      quantity: { x: 360, w: 40 },
+      amount: { x: 440, w: 80 }
     };
 
     let selectedCells = [];
@@ -1737,13 +1737,34 @@
       const colDef = detailColumns[col];
       if (!colDef) return;
 
+      // OCR領域があればそれを使用、なければデフォルト座標
+      const ocrRegion = rowData.ocrRegions?.[colDef.id];
       const colPos = columnPdfPositions[colDef.id];
-      if (!colPos) return;
+
+      let cellX, cellY, cellW, cellH, cellPage;
+
+      if (ocrRegion) {
+        // OCRで取得した領域を使用
+        cellX = ocrRegion.x;
+        cellY = ocrRegion.y;
+        cellW = ocrRegion.w;
+        cellH = ocrRegion.h;
+        cellPage = ocrRegion.page;
+      } else if (colPos) {
+        // デフォルト座標を使用
+        cellX = colPos.x;
+        cellY = rowData.pdfY;
+        cellW = colPos.w;
+        cellH = 25;
+        cellPage = rowData.page;
+      } else {
+        return;
+      }
 
       // ページ切り替えが必要な場合
-      const needPageSwitch = rowData.page && rowData.page !== currentPage;
+      const needPageSwitch = cellPage && cellPage !== currentPage;
       if (needPageSwitch) {
-        currentPage = rowData.page;
+        currentPage = cellPage;
       }
 
       // 確認しやすいズームレベルに設定（2.5倍）
@@ -1754,11 +1775,6 @@
       }
 
       // ハイライト表示とスクロール（描画完了後に実行）
-      const cellX = colPos.x;
-      const cellY = rowData.pdfY;
-      const cellW = colPos.w;
-      const cellH = 18;
-
       requestAnimationFrame(() => {
         renderCellHighlight(cellX, cellY, cellW, cellH);
         requestAnimationFrame(() => {
@@ -1931,7 +1947,7 @@
       }
       const row = Math.min(...selectedCells.map(c => c.row));
       const refRow = detailRows[row] || {};
-      const newRow = { productName: '', productCode: '', unitPrice: '', quantity: '', amount: '', page: refRow.page || 1, pdfY: (refRow.pdfY || 238), original: {} };
+      const newRow = { productName: '', productCode: '', unitPrice: '', quantity: '', amount: '', page: refRow.page || 1, pdfY: (refRow.pdfY || 245), original: {}, ocrRegions: {} };
       detailRows.splice(row, 0, newRow);
       saveUndoState();
       renderDetailTable();
@@ -1945,7 +1961,7 @@
       }
       const row = Math.max(...selectedCells.map(c => c.row));
       const refRow = detailRows[row] || {};
-      const newRow = { productName: '', productCode: '', unitPrice: '', quantity: '', amount: '', page: refRow.page || 1, pdfY: (refRow.pdfY || 238) + 25, original: {} };
+      const newRow = { productName: '', productCode: '', unitPrice: '', quantity: '', amount: '', page: refRow.page || 1, pdfY: (refRow.pdfY || 245) + 25, original: {}, ocrRegions: {} };
       detailRows.splice(row + 1, 0, newRow);
       saveUndoState();
       renderDetailTable();
@@ -2341,6 +2357,30 @@
 
     async function performOcr(x, y, width, height) {
       const pdfCanvas = document.getElementById('pdfCanvas');
+      const viewport = document.getElementById('pdfViewport');
+
+      // 実際のスケールを計算してPDF座標に変換
+      const baseWidth = 595;
+      const baseHeight = 842;
+      const viewportWidth = viewport.clientWidth;
+      const viewportHeight = viewport.clientHeight;
+      const fitScale = Math.min(viewportWidth / baseWidth, viewportHeight / baseHeight, 3.0);
+      const actualZoom = zoom * fitScale;
+
+      // 画面座標からPDF座標に変換
+      const pdfX = x / actualZoom;
+      const pdfY = y / actualZoom;
+      const pdfW = width / actualZoom;
+      const pdfH = height / actualZoom;
+
+      // OCR領域情報を保存用に記録
+      const ocrRegionInfo = {
+        x: pdfX,
+        y: pdfY,
+        w: pdfW,
+        h: pdfH,
+        page: currentPage
+      };
 
       // 選択領域を切り出し
       const tempCanvas = document.createElement('canvas');
@@ -2400,6 +2440,7 @@
               const col = detailColumns[cell.col];
               if (!col.formula && detailRows[cell.row]) {
                 if (!detailRows[cell.row].original) detailRows[cell.row].original = {};
+                if (!detailRows[cell.row].ocrRegions) detailRows[cell.row].ocrRegions = {};
                 if (detailRows[cell.row].original[col.id] === undefined) {
                   detailRows[cell.row].original[col.id] = detailRows[cell.row][col.id];
                 }
@@ -2408,6 +2449,9 @@
                 } else if (parts.length === 1 && partIdx === 0) {
                   detailRows[cell.row][col.id] = lineText;
                 }
+                // OCR領域をセルに紐付けて保存
+                detailRows[cell.row].ocrRegions[col.id] = { ...ocrRegionInfo };
+                detailRows[cell.row].page = ocrRegionInfo.page;
               }
             });
           }
