@@ -1889,15 +1889,12 @@
 
     function renderCellHighlight(x, y, w, h) {
       const layer = document.getElementById('highlightLayer');
-      const viewport = document.getElementById('pdfViewport');
+      const canvas = document.getElementById('pdfCanvas');
       layer.innerHTML = '';
 
+      // キャンバスの実際のサイズからズーム倍率を算出（ビューポート依存を排除）
       const baseWidth = 595;
-      const baseHeight = 842;
-      const viewportWidth = viewport.clientWidth;
-      const viewportHeight = viewport.clientHeight;
-      const fitScale = Math.min(viewportWidth / baseWidth, viewportHeight / baseHeight, 3.0);
-      const actualZoom = zoom * fitScale;
+      const actualZoom = canvas.width / baseWidth;
 
       const div = document.createElement('div');
       div.className = 'cell-highlight';
@@ -1912,12 +1909,12 @@
     function scrollToPdfCell(x, y, w, h) {
       const viewport = document.getElementById('pdfViewport');
       const canvas = document.getElementById('pdfCanvas');
-      const baseWidth = 595;
-      const baseHeight = 842;
       const viewportWidth = viewport.clientWidth;
       const viewportHeight = viewport.clientHeight;
-      const fitScale = Math.min(viewportWidth / baseWidth, viewportHeight / baseHeight, 3.0);
-      const actualZoom = zoom * fitScale;
+
+      // キャンバスの実際のサイズからズーム倍率を算出（renderCellHighlightと一致）
+      const baseWidth = 595;
+      const actualZoom = canvas.width / baseWidth;
 
       // セルの座標をスクリーン座標に変換
       const cellLeft = x * actualZoom;
