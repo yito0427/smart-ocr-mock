@@ -1136,18 +1136,19 @@
       { id: 'amount', name: '金額', width: 100, formula: '{unitPrice}*{quantity}' }
     ];
 
-    // PDF明細テーブルの座標定数
+    // PDF明細テーブルの座標定数（drawInvoiceと完全一致）
     const PDF_TABLE = {
-      getStartY: (page) => page === 1 ? 195 : 30,  // ページ別の明細表開始Y（1ページ目は鑑あり、2ページ目以降は上部から）
+      getStartY: (page) => page === 1 ? 195 : 30,  // ページ別の明細表開始Y
       rowHeight: 20,    // 行の高さ
-      textOffsetY: 4,   // 行内のテキスト開始Y
-      textHeight: 12,   // テキストの高さ
+      textOffsetY: 0,   // ハイライトは行全体をカバー
+      textHeight: 20,   // 行全体の高さ
       cols: {
-        productName: { x: 52, w: 165 },
-        productCode: { x: 217, w: 60 },
-        unitPrice: { x: 277, w: 90 },
-        quantity: { x: 367, w: 70 },
-        amount: { x: 437, w: 110 }
+        // drawInvoiceのfillText位置に合わせた座標
+        productName: { x: 50, w: 170 },   // 50〜220
+        productCode: { x: 220, w: 60 },   // 220〜280
+        unitPrice: { x: 280, w: 90 },     // 280〜370
+        quantity: { x: 370, w: 70 },      // 370〜440
+        amount: { x: 440, w: 110 }        // 440〜550
       }
     };
 
@@ -1896,7 +1897,7 @@
       layer.appendChild(div);
     }
 
-    // PDFビューポートを該当セルにスクロール
+    // PDFビューポートを該当セルにスクロール（セルを中央に表示）
     function scrollToPdfCell(x, y, w, h) {
       const viewport = document.getElementById('pdfViewport');
       const canvas = document.getElementById('pdfCanvas');
@@ -1908,18 +1909,23 @@
       const actualZoom = zoom * fitScale;
 
       // セルの座標をスクリーン座標に変換
+      const cellLeft = x * actualZoom;
       const cellTop = y * actualZoom;
+      const cellWidth = w * actualZoom;
       const cellHeight = h * actualZoom;
 
-      // 横スクロール：常に0（左端から表示）
-      // 明細テーブルは左端から始まるので、常に左端を見せることで見切れを防ぐ
-      let scrollX = 0;
+      // セルの中心座標
+      const cellCenterX = cellLeft + cellWidth / 2;
+      const cellCenterY = cellTop + cellHeight / 2;
 
-      // 縦スクロール：セルが中央付近に来るように
-      let scrollY = cellTop - viewportHeight / 2 + cellHeight / 2;
+      // セルの中心がビューポートの中央に来るようにスクロール
+      let scrollX = cellCenterX - viewportWidth / 2;
+      let scrollY = cellCenterY - viewportHeight / 2;
 
       // キャンバスの範囲外にスクロールしないように制限
+      const maxScrollX = Math.max(0, canvas.width - viewportWidth);
       const maxScrollY = Math.max(0, canvas.height - viewportHeight);
+      scrollX = Math.max(0, Math.min(scrollX, maxScrollX));
       scrollY = Math.max(0, Math.min(scrollY, maxScrollY));
 
       // 即座にスクロール
