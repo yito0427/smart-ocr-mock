@@ -697,8 +697,8 @@
       border: 1px solid var(--border-color);
       border-radius: 6px;
       outline: none;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      white-space: pre-wrap;
+      word-break: break-word;
       transition: border-color 0.2s, box-shadow 0.2s;
     }
 
@@ -1154,32 +1154,32 @@
 
     let detailRows = [
       // 1ページ目: 10行（一部は複数行になる長い商品名）
-      { productName: 'ビジネスノートパソコン 15.6インチ フルHD液晶 Core i7搭載 メモリ16GB SSD512GB', productCode: 'P001', unitPrice: '98000', quantity: '1', amount: '98000', page: 1, pdfRowIndex: 0, original: {}, ocrRegions: {} },
+      { productName: 'ビジネスノートパソコン 15.6インチ\nフルHD液晶 Core i7搭載\nメモリ16GB SSD512GB', productCode: 'P001', unitPrice: '98000', quantity: '1', amount: '98000', page: 1, pdfRowIndex: 0, original: {}, ocrRegions: {} },
       { productName: '液晶モニター27インチ4K対応', productCode: 'P002', unitPrice: '45000', quantity: '2', amount: '90000', page: 1, pdfRowIndex: 1, original: {}, ocrRegions: {} },
-      { productName: 'ワイヤレスキーボード 日本語配列 テンキー付き Bluetooth5.0対応 充電式バッテリー内蔵', productCode: 'P003', unitPrice: '8000', quantity: '3', amount: '24000', page: 1, pdfRowIndex: 2, original: {}, ocrRegions: {} },
+      { productName: 'ワイヤレスキーボード\n日本語配列 テンキー付き\nBluetooth5.0対応', productCode: 'P003', unitPrice: '8000', quantity: '3', amount: '24000', page: 1, pdfRowIndex: 2, original: {}, ocrRegions: {} },
       { productName: 'ワイヤレスマウス（静音タイプ）', productCode: 'P004', unitPrice: '3500', quantity: '5', amount: '17500', page: 1, pdfRowIndex: 3, original: {}, ocrRegions: {} },
-      { productName: 'USBハブ4ポート USB3.0対応 セルフパワー/バスパワー両対応 個別スイッチ付き', productCode: 'P005', unitPrice: '2000', quantity: '3', amount: '6000', page: 1, pdfRowIndex: 4, original: {}, ocrRegions: {} },
+      { productName: 'USBハブ4ポート USB3.0対応\nセルフパワー/バスパワー両対応', productCode: 'P005', unitPrice: '2000', quantity: '3', amount: '6000', page: 1, pdfRowIndex: 4, original: {}, ocrRegions: {} },
       { productName: 'LANケーブル（カテゴリ6A）5m', productCode: 'P006', unitPrice: '1500', quantity: '10', amount: '15000', page: 1, pdfRowIndex: 5, original: {}, ocrRegions: {} },
       { productName: 'ノートPCスタンド折りたたみ式', productCode: 'P007', unitPrice: '4500', quantity: '2', amount: '9000', page: 1, pdfRowIndex: 6, original: {}, ocrRegions: {} },
-      { productName: 'ウェブカメラ フルHD1080p対応 オートフォーカス機能 内蔵マイク付 プライバシーカバー搭載', productCode: 'P008', unitPrice: '6800', quantity: '3', amount: '20400', page: 1, pdfRowIndex: 7, original: {}, ocrRegions: {} },
+      { productName: 'ウェブカメラ フルHD1080p対応\nオートフォーカス機能\n内蔵マイク付 プライバシーカバー', productCode: 'P008', unitPrice: '6800', quantity: '3', amount: '20400', page: 1, pdfRowIndex: 7, original: {}, ocrRegions: {} },
       { productName: 'ヘッドセット（ノイズキャンセリング）', productCode: 'P009', unitPrice: '12000', quantity: '2', amount: '24000', page: 1, pdfRowIndex: 8, original: {}, ocrRegions: {} },
       { productName: '外付けSSD 1TB USB3.2対応', productCode: 'P010', unitPrice: '15000', quantity: '2', amount: '30000', page: 1, pdfRowIndex: 9, original: {}, ocrRegions: {} },
       { pageBreak: true },
       // 2ページ目: 15行
-      { productName: 'デスクトップPC ミニタワー型 第13世代Core i5 メモリ32GB NVMe SSD 1TB Windows11 Pro', productCode: 'P011', unitPrice: '120000', quantity: '1', amount: '120000', page: 2, pdfRowIndex: 0, original: {}, ocrRegions: {} },
+      { productName: 'デスクトップPC ミニタワー型\n第13世代Core i5 メモリ32GB\nNVMe SSD 1TB Windows11 Pro', productCode: 'P011', unitPrice: '120000', quantity: '1', amount: '120000', page: 2, pdfRowIndex: 0, original: {}, ocrRegions: {} },
       { productName: 'メモリ16GB DDR4-3200対応', productCode: 'P012', unitPrice: '8000', quantity: '4', amount: '32000', page: 2, pdfRowIndex: 1, original: {}, ocrRegions: {} },
       { productName: '内蔵SSD 512GB NVMe M.2', productCode: 'P013', unitPrice: '7500', quantity: '3', amount: '22500', page: 2, pdfRowIndex: 2, original: {}, ocrRegions: {} },
-      { productName: 'グラフィックボード NVIDIA GeForce RTX4060 GDDR6 8GB デュアルファン搭載', productCode: 'P014', unitPrice: '45000', quantity: '1', amount: '45000', page: 2, pdfRowIndex: 3, original: {}, ocrRegions: {} },
+      { productName: 'グラフィックボード\nNVIDIA GeForce RTX4060\nGDDR6 8GB デュアルファン搭載', productCode: 'P014', unitPrice: '45000', quantity: '1', amount: '45000', page: 2, pdfRowIndex: 3, original: {}, ocrRegions: {} },
       { productName: '電源ユニット750W 80PLUS', productCode: 'P015', unitPrice: '12000', quantity: '1', amount: '12000', page: 2, pdfRowIndex: 4, original: {}, ocrRegions: {} },
       { productName: 'PCケース（ミドルタワー静音）', productCode: 'P016', unitPrice: '15000', quantity: '1', amount: '15000', page: 2, pdfRowIndex: 5, original: {}, ocrRegions: {} },
       { productName: 'CPUクーラー（空冷式大型）', productCode: 'P017', unitPrice: '6000', quantity: '2', amount: '12000', page: 2, pdfRowIndex: 6, original: {}, ocrRegions: {} },
-      { productName: 'マザーボード ATX LGA1700対応 DDR5メモリ対応 PCIe5.0 M.2スロット×3 WiFi6E標準搭載', productCode: 'P018', unitPrice: '25000', quantity: '1', amount: '25000', page: 2, pdfRowIndex: 7, original: {}, ocrRegions: {} },
+      { productName: 'マザーボード ATX LGA1700対応\nDDR5メモリ対応 PCIe5.0\nM.2スロット×3 WiFi6E標準搭載', productCode: 'P018', unitPrice: '25000', quantity: '1', amount: '25000', page: 2, pdfRowIndex: 7, original: {}, ocrRegions: {} },
       { productName: 'サーマルグリス高性能タイプ', productCode: 'P019', unitPrice: '1500', quantity: '5', amount: '7500', page: 2, pdfRowIndex: 8, original: {}, ocrRegions: {} },
       { productName: 'ケースファン120mm RGB対応', productCode: 'P020', unitPrice: '2500', quantity: '6', amount: '15000', page: 2, pdfRowIndex: 9, original: {}, ocrRegions: {} },
       { productName: 'ファンコントローラー（PWM）', productCode: 'P021', unitPrice: '3500', quantity: '2', amount: '7000', page: 2, pdfRowIndex: 10, original: {}, ocrRegions: {} },
       { productName: 'SATA電源ケーブル延長30cm', productCode: 'P022', unitPrice: '800', quantity: '5', amount: '4000', page: 2, pdfRowIndex: 11, original: {}, ocrRegions: {} },
       { productName: 'ディスプレイポートケーブル2m', productCode: 'P023', unitPrice: '2000', quantity: '3', amount: '6000', page: 2, pdfRowIndex: 12, original: {}, ocrRegions: {} },
-      { productName: 'USB Type-Cハブ 7in1 HDMI出力 SDカードリーダー USB3.0×3ポート PD100W対応', productCode: 'P024', unitPrice: '5500', quantity: '2', amount: '11000', page: 2, pdfRowIndex: 13, original: {}, ocrRegions: {} },
+      { productName: 'USB Type-Cハブ 7in1\nHDMI出力 SDカードリーダー\nUSB3.0×3ポート PD100W対応', productCode: 'P024', unitPrice: '5500', quantity: '2', amount: '11000', page: 2, pdfRowIndex: 13, original: {}, ocrRegions: {} },
       { productName: 'モニターアーム（デュアル対応）', productCode: 'P025', unitPrice: '8000', quantity: '1', amount: '8000', page: 2, pdfRowIndex: 14, original: {}, ocrRegions: {} }
     ];
 
@@ -2406,6 +2406,11 @@
         selectionAnchor = { row: newRow, col: newCol };
       }
       renderDetailTable();
+
+      // キーボード移動でもPDFハイライトを更新
+      if (selectedCells.length === 1) {
+        highlightPdfCell(selectedCells[0].row, selectedCells[0].col);
+      }
     }
 
     // ==========================================
