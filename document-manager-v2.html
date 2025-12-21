@@ -584,7 +584,7 @@
       border-collapse: separate;
       border-spacing: 6px 2px;
       font-size: 13px;
-      min-width: 100%;
+      table-layout: fixed;
     }
 
     .detail-table th,
@@ -695,6 +695,7 @@
     }
 
     .cell-content {
+      display: block;
       padding: 5px 10px;
       height: 26px;
       max-height: 26px;
@@ -1136,11 +1137,11 @@
 
     // 明細テーブル
     let detailColumns = [
-      { id: 'productName', name: '商品名', width: 90 },
-      { id: 'productCode', name: '商品コード', width: 100 },
-      { id: 'unitPrice', name: '単価', width: 80 },
-      { id: 'quantity', name: '数量', width: 60 },
-      { id: 'amount', name: '金額', width: 100, formula: '{unitPrice}*{quantity}' }
+      { id: 'productName', name: '商品名', width: 140 },
+      { id: 'productCode', name: '商品コード', width: 80 },
+      { id: 'unitPrice', name: '単価', width: 70 },
+      { id: 'quantity', name: '数量', width: 50 },
+      { id: 'amount', name: '金額', width: 80, formula: '{unitPrice}*{quantity}' }
     ];
 
     // PDF明細テーブルの座標定数（drawInvoiceと完全一致）
