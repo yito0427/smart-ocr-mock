@@ -1116,23 +1116,32 @@
       { id: 'amount', name: '金額', width: 100, formula: '{unitPrice}*{quantity}' }
     ];
 
+    // PDF明細テーブルの座標定数
+    const PDF_TABLE = {
+      startY: 220,      // 明細テーブル開始Y
+      rowHeight: 25,    // 行の高さ
+      textOffsetY: 5,   // 行内のテキスト開始Y（テキストはy+17に描画、ハイライトはy+5から）
+      textHeight: 15,   // テキストの高さ
+      cols: {
+        productName: { x: 55, w: 115 },
+        productCode: { x: 175, w: 95 },
+        unitPrice: { x: 275, w: 80 },
+        quantity: { x: 355, w: 45 },
+        amount: { x: 405, w: 100 }
+      }
+    };
+
     let detailRows = [
-      { productName: 'ノートPC', productCode: 'P001', unitPrice: '98000', quantity: '1', amount: '98000', page: 1, pdfY: 245, original: {}, ocrRegions: {} },
-      { productName: 'モニター', productCode: 'P002', unitPrice: '35000', quantity: '2', amount: '70000', page: 1, pdfY: 270, original: {}, ocrRegions: {} },
-      { productName: 'キーボード', productCode: 'P003', unitPrice: '8000', quantity: '3', amount: '24000', page: 1, pdfY: 295, original: {}, ocrRegions: {} },
+      { productName: 'ノートPC', productCode: 'P001', unitPrice: '98000', quantity: '1', amount: '98000', page: 1, pdfRowIndex: 0, original: {}, ocrRegions: {} },
+      { productName: 'モニター', productCode: 'P002', unitPrice: '35000', quantity: '2', amount: '70000', page: 1, pdfRowIndex: 1, original: {}, ocrRegions: {} },
+      { productName: 'キーボード', productCode: 'P003', unitPrice: '8000', quantity: '3', amount: '24000', page: 1, pdfRowIndex: 2, original: {}, ocrRegions: {} },
       { pageBreak: true },
-      { productName: 'マウス', productCode: 'P004', unitPrice: '3000', quantity: '5', amount: '15000', page: 2, pdfY: 245, original: {}, ocrRegions: {} },
-      { productName: '', productCode: '', unitPrice: '', quantity: '', amount: '', page: 2, pdfY: 270, original: {}, ocrRegions: {} }
+      { productName: 'マウス', productCode: 'P004', unitPrice: '3000', quantity: '5', amount: '15000', page: 2, pdfRowIndex: 0, original: {}, ocrRegions: {} },
+      { productName: '', productCode: '', unitPrice: '', quantity: '', amount: '', page: 2, pdfRowIndex: 1, original: {}, ocrRegions: {} }
     ];
 
     // 列ごとのPDF座標マッピング（デフォルト値）
-    const columnPdfPositions = {
-      productName: { x: 60, w: 110 },
-      productCode: { x: 180, w: 90 },
-      unitPrice: { x: 280, w: 70 },
-      quantity: { x: 360, w: 40 },
-      amount: { x: 440, w: 80 }
-    };
+    const columnPdfPositions = PDF_TABLE.cols;
 
     let selectedCells = [];
     let selectionAnchor = null;
@@ -1750,12 +1759,13 @@
         cellW = ocrRegion.w;
         cellH = ocrRegion.h;
         cellPage = ocrRegion.page;
-      } else if (colPos) {
-        // デフォルト座標を使用
+      } else if (colPos && rowData.pdfRowIndex !== undefined) {
+        // デフォルト座標を使用（PDF_TABLEから計算）
+        const rowY = PDF_TABLE.startY + (rowData.pdfRowIndex + 1) * PDF_TABLE.rowHeight;
         cellX = colPos.x;
-        cellY = rowData.pdfY;
+        cellY = rowY + PDF_TABLE.textOffsetY;
         cellW = colPos.w;
-        cellH = 25;
+        cellH = PDF_TABLE.textHeight;
         cellPage = rowData.page;
       } else {
         return;
@@ -1947,7 +1957,7 @@
       }
       const row = Math.min(...selectedCells.map(c => c.row));
       const refRow = detailRows[row] || {};
-      const newRow = { productName: '', productCode: '', unitPrice: '', quantity: '', amount: '', page: refRow.page || 1, pdfY: (refRow.pdfY || 245), original: {}, ocrRegions: {} };
+      const newRow = { productName: '', productCode: '', unitPrice: '', quantity: '', amount: '', page: refRow.page || 1, pdfRowIndex: refRow.pdfRowIndex || 0, original: {}, ocrRegions: {} };
       detailRows.splice(row, 0, newRow);
       saveUndoState();
       renderDetailTable();
@@ -1961,7 +1971,7 @@
       }
       const row = Math.max(...selectedCells.map(c => c.row));
       const refRow = detailRows[row] || {};
-      const newRow = { productName: '', productCode: '', unitPrice: '', quantity: '', amount: '', page: refRow.page || 1, pdfY: (refRow.pdfY || 245) + 25, original: {}, ocrRegions: {} };
+      const newRow = { productName: '', productCode: '', unitPrice: '', quantity: '', amount: '', page: refRow.page || 1, pdfRowIndex: (refRow.pdfRowIndex || 0) + 1, original: {}, ocrRegions: {} };
       detailRows.splice(row + 1, 0, newRow);
       saveUndoState();
       renderDetailTable();
