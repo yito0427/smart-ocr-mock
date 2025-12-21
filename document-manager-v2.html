@@ -1131,7 +1131,7 @@
     let currentTool = 'select';
     let currentPage = 1;
     let totalPages = 2;
-    let zoom = 1;
+    let zoom = 1.5;
     let isDrawing = false;
     let lastX = 0, lastY = 0;
 
@@ -1993,7 +1993,7 @@
 
     // 全体表示に戻す
     function resetPdfView() {
-      zoom = 1.0;
+      zoom = 1.5;
       clearCellHighlight();
       renderPdfCanvas();
       document.getElementById('pdfViewport').scrollTo({ top: 0, left: 0, behavior: 'smooth' });
