@@ -1821,12 +1821,11 @@
       }
 
       // ハイライト表示とスクロール（描画完了後に実行）
-      requestAnimationFrame(() => {
+      // setTimeoutで確実にキャンバス描画完了を待つ
+      setTimeout(() => {
         renderCellHighlight(cellX, cellY, cellW, cellH);
-        requestAnimationFrame(() => {
-          scrollToPdfCell(cellX, cellY, cellW, cellH);
-        });
-      });
+        scrollToPdfCell(cellX, cellY, cellW, cellH);
+      }, 50);
     }
 
     function renderCellHighlight(x, y, w, h) {
@@ -1868,22 +1867,12 @@
       const cellHeight = h * actualZoom;
 
       // PDFテーブルの左端（x=50）も見えるようにする
-      const tableLeft = 50 * actualZoom;
-      const padding = 20; // 余白
+      // 常にテーブル左端から表示開始することで、左端列が見切れる問題を解決
+      const tableLeftX = 45 * actualZoom;  // テーブル枠より少し左
+      const padding = 10;
 
-      // 横スクロール：テーブル左端からセル右端までが見えるように
-      // セルが画面内に収まる場合は、テーブル左端を基準にする
-      let scrollX;
-      const cellRight = cellLeft + cellWidth;
-      const visibleWidth = cellRight - tableLeft + padding * 2;
-
-      if (visibleWidth <= viewportWidth) {
-        // テーブル左端とセルが両方見える場合、テーブル左端を少し見せる
-        scrollX = Math.max(0, tableLeft - padding);
-      } else {
-        // セルが大きい場合、セルの左端を優先
-        scrollX = Math.max(0, cellLeft - padding);
-      }
+      // 横スクロール：常にテーブル左端を基準に（左端列が見切れないように）
+      let scrollX = Math.max(0, tableLeftX - padding);
 
       // 縦スクロール：セルが中央付近に来るように
       let scrollY = cellTop - viewportHeight / 2 + cellHeight / 2;
@@ -1894,10 +1883,11 @@
       scrollX = Math.max(0, Math.min(scrollX, maxScrollX));
       scrollY = Math.max(0, Math.min(scrollY, maxScrollY));
 
+      // 即座にスクロール（smoothだとタイミング問題が発生する）
       viewport.scrollTo({
         left: scrollX,
         top: scrollY,
-        behavior: 'smooth'
+        behavior: 'instant'
       });
     }
 
