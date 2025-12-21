@@ -604,6 +604,26 @@
       text-align: left;
       border-bottom: 1px solid #e8e0d0;
       position: relative;
+      cursor: grab;
+      transition: background 0.15s, transform 0.15s;
+    }
+
+    .detail-table thead th:active {
+      cursor: grabbing;
+    }
+
+    .detail-table thead th.dragging {
+      opacity: 0.5;
+      background: #e8e0d0;
+    }
+
+    .detail-table thead th.drag-over {
+      background: var(--teal-light);
+      box-shadow: inset 0 0 0 2px var(--teal);
+    }
+
+    .detail-table thead th .col-header-content {
+      pointer-events: none;
     }
 
     .detail-table thead th.row-number-header {
@@ -1666,11 +1686,18 @@
       const thead = document.getElementById('detailTableHead');
       const tbody = document.getElementById('detailTableBody');
 
-      // ヘッダー行（列名を表示）
+      // ヘッダー行（列名を表示、ドラッグ&ドロップで並び替え可能）
       let headerHtml = '<tr><th class="row-number-header">#</th>';
       detailColumns.forEach((col, idx) => {
-        headerHtml += `<th style="width:${col.width}px;min-width:${col.width}px;">
-          ${col.name}
+        headerHtml += `<th style="width:${col.width}px;min-width:${col.width}px;"
+                          draggable="true"
+                          ondragstart="handleColDragStart(event,${idx})"
+                          ondragover="handleColDragOver(event,${idx})"
+                          ondragenter="handleColDragEnter(event,${idx})"
+                          ondragleave="handleColDragLeave(event)"
+                          ondrop="handleColDrop(event,${idx})"
+                          ondragend="handleColDragEnd(event)">
+          <span class="col-header-content">${col.name}</span>
           <span class="col-resizer" onmousedown="startColResize(event,${idx})" ondblclick="autoFitColumn(${idx})" title="ダブルクリックで自動調整"></span>
         </th>`;
       });
@@ -2068,19 +2095,78 @@
       }
     }
 
+    // ==========================================
+    // 列ドラッグ＆ドロップ並び替え
+    // ==========================================
     let dragColIdx = null;
-    function dragColumn(e, idx) {
+    let dragOverColIdx = null;
+
+    function handleColDragStart(e, idx) {
       dragColIdx = idx;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', idx.toString());
+
+      // ドラッグ中のスタイルを適用
+      requestAnimationFrame(() => {
+        e.target.classList.add('dragging');
+      });
     }
 
-    function dropColumn(e, idx) {
+    function handleColDragOver(e, idx) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    }
+
+    function handleColDragEnter(e, idx) {
+      e.preventDefault();
       if (dragColIdx !== null && dragColIdx !== idx) {
+        // 前のドラッグオーバー要素からクラスを削除
+        document.querySelectorAll('.detail-table thead th.drag-over').forEach(th => {
+          th.classList.remove('drag-over');
+        });
+        e.target.closest('th').classList.add('drag-over');
+        dragOverColIdx = idx;
+      }
+    }
+
+    function handleColDragLeave(e) {
+      // 子要素への移動の場合は無視
+      if (e.target.closest('th') && !e.target.closest('th').contains(e.relatedTarget)) {
+        e.target.closest('th').classList.remove('drag-over');
+      }
+    }
+
+    function handleColDrop(e, idx) {
+      e.preventDefault();
+
+      // 全てのdrag-overクラスを削除
+      document.querySelectorAll('.detail-table thead th.drag-over').forEach(th => {
+        th.classList.remove('drag-over');
+      });
+
+      if (dragColIdx !== null && dragColIdx !== idx) {
+        // 列を移動
         const col = detailColumns.splice(dragColIdx, 1)[0];
         detailColumns.splice(idx, 0, col);
+
+        // detailRowsのデータ順序も対応（キーベースなので順序変更不要だがPDF座標マッピングを更新）
+        saveUndoState();
         renderDetailTable();
         showToast('列を移動しました', 'success');
       }
+
       dragColIdx = null;
+      dragOverColIdx = null;
+    }
+
+    function handleColDragEnd(e) {
+      // 全てのドラッグ関連クラスを削除
+      document.querySelectorAll('.detail-table thead th').forEach(th => {
+        th.classList.remove('dragging', 'drag-over');
+      });
+
+      dragColIdx = null;
+      dragOverColIdx = null;
     }
 
     let resizeColIdx = null;
