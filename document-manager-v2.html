@@ -1817,6 +1817,7 @@
     // PDFビューポートを該当セルにスクロール
     function scrollToPdfCell(x, y, w, h) {
       const viewport = document.getElementById('pdfViewport');
+      const canvas = document.getElementById('pdfCanvas');
       const baseWidth = 595;
       const baseHeight = 842;
       const viewportWidth = viewport.clientWidth;
@@ -1824,17 +1825,34 @@
       const fitScale = Math.min(viewportWidth / baseWidth, viewportHeight / baseHeight, 3.0);
       const actualZoom = zoom * fitScale;
 
-      // セルの中心座標を計算
-      const cellCenterX = (x + w / 2) * actualZoom;
-      const cellCenterY = (y + h / 2) * actualZoom;
+      // セルの座標をスクリーン座標に変換
+      const cellLeft = x * actualZoom;
+      const cellTop = y * actualZoom;
+      const cellRight = (x + w) * actualZoom;
+      const cellBottom = (y + h) * actualZoom;
+      const cellCenterX = (cellLeft + cellRight) / 2;
+      const cellCenterY = (cellTop + cellBottom) / 2;
 
-      // ビューポートの中心にセルが来るようスクロール
-      const scrollX = cellCenterX - viewportWidth / 2;
-      const scrollY = cellCenterY - viewportHeight / 2;
+      // セルが画面中央付近に来るようにスクロール（ただし左端は余白を確保）
+      const margin = 50; // 左右の余白
+      let scrollX = cellCenterX - viewportWidth / 2;
+      let scrollY = cellCenterY - viewportHeight / 2;
+
+      // セルの左端が見切れないように調整
+      const minScrollX = cellLeft - margin;
+      if (scrollX > minScrollX) {
+        scrollX = Math.max(0, minScrollX);
+      }
+
+      // キャンバスの範囲外にスクロールしないように制限
+      const maxScrollX = canvas.width - viewportWidth;
+      const maxScrollY = canvas.height - viewportHeight;
+      scrollX = Math.max(0, Math.min(scrollX, maxScrollX));
+      scrollY = Math.max(0, Math.min(scrollY, maxScrollY));
 
       viewport.scrollTo({
-        left: Math.max(0, scrollX),
-        top: Math.max(0, scrollY),
+        left: scrollX,
+        top: scrollY,
         behavior: 'smooth'
       });
     }
