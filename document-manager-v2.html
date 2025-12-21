@@ -1861,29 +1861,21 @@
       const actualZoom = zoom * fitScale;
 
       // セルの座標をスクリーン座標に変換
-      const cellLeft = x * actualZoom;
       const cellTop = y * actualZoom;
-      const cellWidth = w * actualZoom;
       const cellHeight = h * actualZoom;
 
-      // PDFテーブルの左端（x=50）も見えるようにする
-      // 常にテーブル左端から表示開始することで、左端列が見切れる問題を解決
-      const tableLeftX = 45 * actualZoom;  // テーブル枠より少し左
-      const padding = 10;
-
-      // 横スクロール：常にテーブル左端を基準に（左端列が見切れないように）
-      let scrollX = Math.max(0, tableLeftX - padding);
+      // 横スクロール：常に0（左端から表示）
+      // 明細テーブルは左端から始まるので、常に左端を見せることで見切れを防ぐ
+      let scrollX = 0;
 
       // 縦スクロール：セルが中央付近に来るように
       let scrollY = cellTop - viewportHeight / 2 + cellHeight / 2;
 
       // キャンバスの範囲外にスクロールしないように制限
-      const maxScrollX = Math.max(0, canvas.width - viewportWidth);
       const maxScrollY = Math.max(0, canvas.height - viewportHeight);
-      scrollX = Math.max(0, Math.min(scrollX, maxScrollX));
       scrollY = Math.max(0, Math.min(scrollY, maxScrollY));
 
-      // 即座にスクロール（smoothだとタイミング問題が発生する）
+      // 即座にスクロール
       viewport.scrollTo({
         left: scrollX,
         top: scrollY,
