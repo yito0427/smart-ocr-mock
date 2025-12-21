@@ -603,7 +603,9 @@
       padding: 8px 12px;
       text-align: left;
       border-bottom: 1px solid #e8e0d0;
-      position: relative;
+      position: sticky;
+      top: 0;
+      z-index: 10;
       cursor: grab;
       transition: background 0.15s, transform 0.15s;
     }
@@ -1828,6 +1830,8 @@
 
       renderDetailTable();
       highlightPdfCell(row, col);
+      // 選択セルが見えるようにスクロール
+      setTimeout(() => scrollDetailTableToCell(row, col), 0);
     }
 
     // PDFプレビュー上のセルハイライトと拡大フォーカス
@@ -1948,6 +1952,35 @@
     function clearCellHighlight() {
       const layer = document.getElementById('highlightLayer');
       if (layer) layer.innerHTML = '';
+    }
+
+    // 明細テーブルの選択セルをスクロールして表示
+    function scrollDetailTableToCell(row, col) {
+      const wrapper = document.getElementById('detailTableWrapper');
+      const cell = document.querySelector(`.detail-table td[data-row="${row}"][data-col="${col}"]`);
+      if (!wrapper || !cell) return;
+
+      const wrapperRect = wrapper.getBoundingClientRect();
+      const cellRect = cell.getBoundingClientRect();
+      const headerHeight = 40; // ヘッダーの高さ（sticky分）
+
+      // 縦スクロール：セルが見える位置に調整
+      if (cellRect.top < wrapperRect.top + headerHeight) {
+        // セルが上に隠れている
+        wrapper.scrollTop -= (wrapperRect.top + headerHeight - cellRect.top + 10);
+      } else if (cellRect.bottom > wrapperRect.bottom) {
+        // セルが下に隠れている
+        wrapper.scrollTop += (cellRect.bottom - wrapperRect.bottom + 10);
+      }
+
+      // 横スクロール：セルが見える位置に調整
+      if (cellRect.left < wrapperRect.left) {
+        // セルが左に隠れている
+        wrapper.scrollLeft -= (wrapperRect.left - cellRect.left + 10);
+      } else if (cellRect.right > wrapperRect.right) {
+        // セルが右に隠れている
+        wrapper.scrollLeft += (cellRect.right - wrapperRect.right + 10);
+      }
     }
 
     // 全体表示に戻す
@@ -2409,9 +2442,11 @@
       }
       renderDetailTable();
 
-      // キーボード移動でもPDFハイライトを更新
+      // キーボード移動でもPDFハイライトを更新＆明細テーブルをスクロール
       if (selectedCells.length === 1) {
-        highlightPdfCell(selectedCells[0].row, selectedCells[0].col);
+        const { row, col } = selectedCells[0];
+        highlightPdfCell(row, col);
+        setTimeout(() => scrollDetailTableToCell(row, col), 0);
       }
     }
 
