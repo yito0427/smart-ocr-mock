@@ -1837,25 +1837,33 @@
       // セルの座標をスクリーン座標に変換
       const cellLeft = x * actualZoom;
       const cellTop = y * actualZoom;
-      const cellRight = (x + w) * actualZoom;
-      const cellBottom = (y + h) * actualZoom;
-      const cellCenterX = (cellLeft + cellRight) / 2;
-      const cellCenterY = (cellTop + cellBottom) / 2;
+      const cellWidth = w * actualZoom;
+      const cellHeight = h * actualZoom;
 
-      // セルが画面中央付近に来るようにスクロール（ただし左端は余白を確保）
-      const margin = 50; // 左右の余白
-      let scrollX = cellCenterX - viewportWidth / 2;
-      let scrollY = cellCenterY - viewportHeight / 2;
+      // PDFテーブルの左端（x=50）も見えるようにする
+      const tableLeft = 50 * actualZoom;
+      const padding = 20; // 余白
 
-      // セルの左端が見切れないように調整
-      const minScrollX = cellLeft - margin;
-      if (scrollX > minScrollX) {
-        scrollX = Math.max(0, minScrollX);
+      // 横スクロール：テーブル左端からセル右端までが見えるように
+      // セルが画面内に収まる場合は、テーブル左端を基準にする
+      let scrollX;
+      const cellRight = cellLeft + cellWidth;
+      const visibleWidth = cellRight - tableLeft + padding * 2;
+
+      if (visibleWidth <= viewportWidth) {
+        // テーブル左端とセルが両方見える場合、テーブル左端を少し見せる
+        scrollX = Math.max(0, tableLeft - padding);
+      } else {
+        // セルが大きい場合、セルの左端を優先
+        scrollX = Math.max(0, cellLeft - padding);
       }
 
+      // 縦スクロール：セルが中央付近に来るように
+      let scrollY = cellTop - viewportHeight / 2 + cellHeight / 2;
+
       // キャンバスの範囲外にスクロールしないように制限
-      const maxScrollX = canvas.width - viewportWidth;
-      const maxScrollY = canvas.height - viewportHeight;
+      const maxScrollX = Math.max(0, canvas.width - viewportWidth);
+      const maxScrollY = Math.max(0, canvas.height - viewportHeight);
       scrollX = Math.max(0, Math.min(scrollX, maxScrollX));
       scrollY = Math.max(0, Math.min(scrollY, maxScrollY));
 
