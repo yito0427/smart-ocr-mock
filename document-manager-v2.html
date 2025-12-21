@@ -1143,11 +1143,11 @@
       textOffsetY: 4,   // 行内のテキスト開始Y
       textHeight: 12,   // テキストの高さ
       cols: {
-        productName: { x: 52, w: 125 },
-        productCode: { x: 177, w: 100 },
-        unitPrice: { x: 277, w: 80 },
-        quantity: { x: 357, w: 70 },
-        amount: { x: 427, w: 120 }
+        productName: { x: 52, w: 165 },
+        productCode: { x: 217, w: 60 },
+        unitPrice: { x: 277, w: 90 },
+        quantity: { x: 367, w: 70 },
+        amount: { x: 437, w: 110 }
       }
     };
 
@@ -1510,14 +1510,14 @@
       ctx.fillRect(50, tableStartY, 500, 25);
       ctx.fillStyle = '#333';
       ctx.font = 'bold 10px sans-serif';
-      ctx.fillText('商品名', 60, tableStartY + 17);
-      ctx.fillText('商品コード', 180, tableStartY + 17);
-      ctx.fillText('単価', 290, tableStartY + 17);
-      ctx.fillText('数量', 360, tableStartY + 17);
-      ctx.fillText('金額', 440, tableStartY + 17);
+      ctx.fillText('商品名', 55, tableStartY + 17);
+      ctx.fillText('コード', 220, tableStartY + 17);
+      ctx.fillText('単価', 285, tableStartY + 17);
+      ctx.fillText('数量', 370, tableStartY + 17);
+      ctx.fillText('金額', 450, tableStartY + 17);
 
       // 明細行（1ページ目: 10行、2ページ目: 15行）
-      ctx.font = '9px sans-serif';
+      ctx.font = '8px sans-serif';
       const items = page === 1 ? [
         ['ノートパソコン本体（15.6インチ）', 'P001', '¥98,000', '1', '¥98,000'],
         ['液晶モニター27インチ4K対応', 'P002', '¥45,000', '2', '¥90,000'],
@@ -1551,10 +1551,10 @@
         const y = tableStartY + 25 + i * 20;
         ctx.strokeRect(50, y, 500, 20);
         ctx.fillText(item[0], 55, y + 14);
-        ctx.fillText(item[1], 180, y + 14);
+        ctx.fillText(item[1], 220, y + 14);
         ctx.fillText(item[2], 280, y + 14);
-        ctx.fillText(item[3], 360, y + 14);
-        ctx.fillText(item[4], 430, y + 14);
+        ctx.fillText(item[3], 370, y + 14);
+        ctx.fillText(item[4], 440, y + 14);
       });
 
       if (page === 2) {
@@ -1868,8 +1868,11 @@
       // setTimeoutで確実にキャンバス描画完了を待つ
       setTimeout(() => {
         renderCellHighlight(cellX, cellY, cellW, cellH);
-        scrollToPdfCell(cellX, cellY, cellW, cellH);
-      }, 50);
+        // スクロールは別タイミングで実行（ハイライト描画後）
+        requestAnimationFrame(() => {
+          scrollToPdfCell(cellX, cellY, cellW, cellH);
+        });
+      }, 100);
     }
 
     function renderCellHighlight(x, y, w, h) {
