@@ -2426,11 +2426,33 @@
       const current = selectedCells[selectedCells.length - 1];
       let newRow = current.row, newCol = current.col;
 
-      if (e.key === 'ArrowUp') newRow = Math.max(0, newRow - 1);
-      else if (e.key === 'ArrowDown') newRow = Math.min(detailRows.length - 1, newRow + 1);
-      else if (e.key === 'ArrowLeft') newCol = Math.max(0, newCol - 1);
-      else if (e.key === 'ArrowRight' || e.key === 'Tab') newCol = Math.min(detailColumns.length - 1, newCol + 1);
-      else if (e.key === 'Enter') newRow = Math.min(detailRows.length - 1, newRow + 1);
+      if (e.key === 'ArrowUp') {
+        newRow = Math.max(0, newRow - 1);
+      } else if (e.key === 'ArrowDown') {
+        newRow = Math.min(detailRows.length - 1, newRow + 1);
+      } else if (e.key === 'ArrowLeft') {
+        if (newCol === 0) {
+          // 一番左の列で←キー → 一つ上の行の一番右の列へ
+          if (newRow > 0) {
+            newRow = newRow - 1;
+            newCol = detailColumns.length - 1;
+          }
+        } else {
+          newCol = newCol - 1;
+        }
+      } else if (e.key === 'ArrowRight' || e.key === 'Tab') {
+        if (newCol === detailColumns.length - 1) {
+          // 一番右の列で→キー → 一つ下の行の一番左の列へ
+          if (newRow < detailRows.length - 1) {
+            newRow = newRow + 1;
+            newCol = 0;
+          }
+        } else {
+          newCol = newCol + 1;
+        }
+      } else if (e.key === 'Enter') {
+        newRow = Math.min(detailRows.length - 1, newRow + 1);
+      }
 
       // Shift+→で次ページへ
       if (e.shiftKey && e.key === 'ArrowRight') {
@@ -2438,8 +2460,19 @@
         return;
       }
 
+      // pageBreak行をスキップ
       while (detailRows[newRow]?.pageBreak) {
-        newRow += (e.key === 'ArrowUp' ? -1 : 1);
+        if (e.key === 'ArrowUp' || (e.key === 'ArrowLeft' && current.col === 0)) {
+          newRow = newRow - 1;
+        } else {
+          newRow = newRow + 1;
+        }
+        // 範囲外に出たら元に戻す
+        if (newRow < 0 || newRow >= detailRows.length) {
+          newRow = current.row;
+          newCol = current.col;
+          break;
+        }
       }
 
       if (e.shiftKey) {
