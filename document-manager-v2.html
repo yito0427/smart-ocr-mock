@@ -1137,11 +1137,11 @@
 
     // 明細テーブル
     let detailColumns = [
-      { id: 'productName', name: '商品名', width: 100 },
-      { id: 'productCode', name: '商品コード', width: 80 },
-      { id: 'unitPrice', name: '単価', width: 70 },
-      { id: 'quantity', name: '数量', width: 50 },
-      { id: 'amount', name: '金額', width: 80, formula: '{unitPrice}*{quantity}' }
+      { id: 'productName', name: '商品名', width: 120 },
+      { id: 'productCode', name: '商品コード', width: 70 },
+      { id: 'unitPrice', name: '単価', width: 60 },
+      { id: 'quantity', name: '数量', width: 40 },
+      { id: 'amount', name: '金額', width: 70, formula: '{unitPrice}*{quantity}' }
     ];
 
     // PDF明細テーブルの座標定数（drawInvoiceと完全一致）
@@ -1742,7 +1742,7 @@
       // ヘッダー行（列名を表示、ドラッグ&ドロップで並び替え可能）
       let headerHtml = '<tr><th class="row-number-header">#</th>';
       detailColumns.forEach((col, idx) => {
-        headerHtml += `<th style="width:${col.width}px;min-width:${col.width}px;"
+        headerHtml += `<th style="width:${col.width}px;max-width:${col.width}px;"
                           draggable="true"
                           ondragstart="handleColDragStart(event,${idx})"
                           ondragover="handleColDragOver(event,${idx})"
@@ -1780,7 +1780,7 @@
             selectedCells.some(c => c.row === rowIdx && c.col === colIdx) ? 'selected' : ''
           ].filter(Boolean).join(' ');
 
-          bodyHtml += `<td class="${cellClass}" data-row="${rowIdx}" data-col="${colIdx}" style="width:${col.width}px;min-width:${col.width}px;"
+          bodyHtml += `<td class="${cellClass}" data-row="${rowIdx}" data-col="${colIdx}" style="width:${col.width}px;max-width:${col.width}px;"
                           onclick="handleCellClick(event,${rowIdx},${colIdx})"
                           onmousedown="handleCellMouseDown(event,${rowIdx},${colIdx})"
                           onmouseover="handleCellMouseOver(event,${rowIdx},${colIdx})"
