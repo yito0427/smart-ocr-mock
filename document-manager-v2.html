@@ -1118,9 +1118,9 @@
 
     // PDF明細テーブルの座標定数
     const PDF_TABLE = {
-      startY: 220,      // 明細テーブル開始Y
+      getStartY: (page) => page === 1 ? 195 : 30,  // ページ別の明細表開始Y（1ページ目は鑑あり、2ページ目以降は上部から）
       rowHeight: 25,    // 行の高さ
-      textOffsetY: 5,   // 行内のテキスト開始Y（テキストはy+17に描画、ハイライトはy+5から）
+      textOffsetY: 5,   // 行内のテキスト開始Y
       textHeight: 15,   // テキストの高さ
       cols: {
         productName: { x: 55, w: 115 },
@@ -1437,35 +1437,42 @@
 
     function drawInvoice(ctx, page) {
       ctx.fillStyle = '#333';
-      ctx.font = 'bold 24px sans-serif';
-      ctx.fillText('請　求　書', 230, 60);
 
-      ctx.font = '12px sans-serif';
-      ctx.fillText(`発行日: 2024-01-15`, 420, 40);
-      ctx.fillText(`請求番号: INV-2024-001`, 420, 55);
+      // 2ページ目は鑑なし、上部から明細表開始
+      const tableStartY = page === 1 ? 195 : 30;
 
-      ctx.font = '14px sans-serif';
-      ctx.fillText('株式会社ABC 御中', 50, 100);
+      if (page === 1) {
+        // 1ページ目のみ：鑑（ヘッダー情報）
+        ctx.font = 'bold 24px sans-serif';
+        ctx.fillText('請　求　書', 230, 60);
 
-      ctx.font = '12px sans-serif';
-      ctx.fillText('下記の通りご請求申し上げます。', 50, 140);
+        ctx.font = '12px sans-serif';
+        ctx.fillText(`発行日: 2024-01-15`, 420, 40);
+        ctx.fillText(`請求番号: INV-2024-001`, 420, 55);
 
-      ctx.font = 'bold 16px sans-serif';
-      ctx.fillText('ご請求金額: ¥207,000-', 50, 170);
+        ctx.font = '14px sans-serif';
+        ctx.fillText('株式会社ABC 御中', 50, 100);
+
+        ctx.font = '12px sans-serif';
+        ctx.fillText('下記の通りご請求申し上げます。', 50, 140);
+
+        ctx.font = 'bold 16px sans-serif';
+        ctx.fillText('ご請求金額: ¥207,000-', 50, 170);
+      }
 
       // 明細表ヘッダー
       ctx.strokeStyle = '#333';
       ctx.lineWidth = 1;
-      ctx.strokeRect(50, 195, 500, 25);
+      ctx.strokeRect(50, tableStartY, 500, 25);
       ctx.fillStyle = '#f0f0f0';
-      ctx.fillRect(50, 195, 500, 25);
+      ctx.fillRect(50, tableStartY, 500, 25);
       ctx.fillStyle = '#333';
       ctx.font = 'bold 11px sans-serif';
-      ctx.fillText('商品名', 60, 212);
-      ctx.fillText('商品コード', 180, 212);
-      ctx.fillText('単価', 280, 212);
-      ctx.fillText('数量', 360, 212);
-      ctx.fillText('金額', 440, 212);
+      ctx.fillText('商品名', 60, tableStartY + 17);
+      ctx.fillText('商品コード', 180, tableStartY + 17);
+      ctx.fillText('単価', 280, tableStartY + 17);
+      ctx.fillText('数量', 360, tableStartY + 17);
+      ctx.fillText('金額', 440, tableStartY + 17);
 
       // 明細行
       ctx.font = '11px sans-serif';
@@ -1477,7 +1484,7 @@
          ['', '', '', '', '']];
 
       items.forEach((item, i) => {
-        const y = 220 + (i + 1) * 25;
+        const y = tableStartY + 25 + i * 25;
         ctx.strokeRect(50, y, 500, 25);
         ctx.fillText(item[0], 60, y + 17);
         ctx.fillText(item[1], 180, y + 17);
@@ -1487,8 +1494,9 @@
       });
 
       if (page === 2) {
+        const lastRowY = tableStartY + 25 + items.length * 25;
         ctx.font = 'bold 12px sans-serif';
-        ctx.fillText('合計: ¥207,000', 440, 350);
+        ctx.fillText('合計: ¥207,000', 440, lastRowY + 30);
       }
 
       // 発行者情報
@@ -1760,8 +1768,9 @@
         cellH = ocrRegion.h;
         cellPage = ocrRegion.page;
       } else if (colPos && rowData.pdfRowIndex !== undefined) {
-        // デフォルト座標を使用（PDF_TABLEから計算）
-        const rowY = PDF_TABLE.startY + (rowData.pdfRowIndex + 1) * PDF_TABLE.rowHeight;
+        // デフォルト座標を使用（PDF_TABLEから計算、ページ別の開始位置）
+        const tableStartY = PDF_TABLE.getStartY(rowData.page);
+        const rowY = tableStartY + 25 + rowData.pdfRowIndex * PDF_TABLE.rowHeight;
         cellX = colPos.x;
         cellY = rowY + PDF_TABLE.textOffsetY;
         cellW = colPos.w;
