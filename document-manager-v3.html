@@ -1777,8 +1777,8 @@
         bodyHtml += `<td class="row-number">${rowNum}</td>`;
         detailColumns.forEach((col, colIdx) => {
           const rawValue = row[col.id] || '';
-          const isMultiline = rawValue.includes('\n');
-          const value = isMultiline ? rawValue.replace(/\n/g, '<br>') : rawValue;
+          const isMultiline = rawValue.includes('\n') && !row._forceSingleLine;
+          const value = isMultiline ? rawValue.replace(/\n/g, '<br>') : (row._forceSingleLine ? rawValue.split('\n')[0] : rawValue);
           const isModified = row.original?.[col.id] !== undefined && row.original[col.id] !== rawValue;
           const isFormula = col.formula;
           const cellClass = [
@@ -2076,7 +2076,7 @@
         .replace(/&lt;/gi, '<')
         .replace(/&gt;/gi, '>')
         .replace(/&amp;/gi, '&')
-        .replace(/^\n/, ''); // 先頭の余分な改行を除去
+        .trim(); // 前後の余分な改行を除去
       if (!detailRows[row].original) detailRows[row].original = {};
       if (detailRows[row].original[colId] === undefined) {
         detailRows[row].original[colId] = detailRows[row][colId];
@@ -2096,7 +2096,8 @@
         .replace(/&lt;/gi, '<')
         .replace(/&gt;/gi, '>')
         .replace(/&amp;/gi, '&')
-        .replace(/^\n/, '');
+        .trim();
+      if (!detailRows[row]) return; // 行が削除済みの場合はスキップ
       if (!detailRows[row].original) detailRows[row].original = {};
       if (detailRows[row].original[colId] === undefined) {
         detailRows[row].original[colId] = detailRows[row][colId];
@@ -2432,12 +2433,10 @@
         }
       });
 
-      // セル内切り取り後に行の高さを自動調整（同じ行の他列も連動）
+      // セル内切り取り後に行の高さを自動調整
       document.addEventListener('cut', (e) => {
         const cell = document.activeElement;
         if (!cell.classList.contains('cell-content')) return;
-        // cut前のセル内容を保存して、どの行が切り取られたか特定する
-        const beforeLines = cell.innerText.split('\n').filter(l => l.trim() !== '');
 
         // cut後のDOM更新を待ってから処理
         setTimeout(() => {
@@ -2457,45 +2456,16 @@
           const colId = detailColumns[colIdx]?.id;
           if (!colId) return;
 
-          // データを更新
+          // このセルのデータのみ更新（他列は変更しない）
           if (!detailRows[rowIdx].original) detailRows[rowIdx].original = {};
           if (detailRows[rowIdx].original[colId] === undefined) {
             detailRows[rowIdx].original[colId] = detailRows[rowIdx][colId];
           }
           detailRows[rowIdx][colId] = afterValue;
 
-          // 切り取られた行を特定（beforeとafterの差分、空行を除外して比較）
-          const afterLines = afterValue.split('\n').filter(l => l.trim() !== '');
-          if (beforeLines.length > afterLines.length) {
-            // 削除された行のインデックスを特定
-            let removedLineIdx = -1;
-            for (let i = 0; i < beforeLines.length; i++) {
-              if (beforeLines[i].trim() !== (afterLines[i] || '').trim()) {
-                removedLineIdx = i;
-                break;
-              }
-            }
-            // 見つからなかった場合は最後の行が削除された
-            if (removedLineIdx === -1) {
-              removedLineIdx = beforeLines.length - 1;
-            }
-
-            // 同じ行の他の列からも対応する行を削除
-            detailColumns.forEach((col, cIdx) => {
-              if (cIdx === colIdx) return; // 編集中のセルはスキップ
-              const val = detailRows[rowIdx][col.id] || '';
-              if (val.includes('\n')) {
-                const lines = val.split('\n');
-                if (removedLineIdx < lines.length) {
-                  if (!detailRows[rowIdx].original) detailRows[rowIdx].original = {};
-                  if (detailRows[rowIdx].original[col.id] === undefined) {
-                    detailRows[rowIdx].original[col.id] = val;
-                  }
-                  lines.splice(removedLineIdx, 1);
-                  detailRows[rowIdx][col.id] = lines.join('\n');
-                }
-              }
-            });
+          // セルが1行になったら、行全体を強制的に1行表示にする（データは変えない）
+          if (!afterValue.includes('\n')) {
+            detailRows[rowIdx]._forceSingleLine = true;
           }
 
           // 再描画して行の高さを更新
