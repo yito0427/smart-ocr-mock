@@ -1778,7 +1778,7 @@
         detailColumns.forEach((col, colIdx) => {
           const rawValue = row[col.id] || '';
           const isMultiline = rawValue.includes('\n') && !row._forceSingleLine;
-          const value = isMultiline ? rawValue.replace(/\n/g, '<br>') : (row._forceSingleLine ? rawValue.split('\n')[0] : rawValue);
+          const value = isMultiline ? rawValue.replace(/\n/g, '<br>') : rawValue;
           const isModified = row.original?.[col.id] !== undefined && row.original[col.id] !== rawValue;
           const isFormula = col.formula;
           const cellClass = [
