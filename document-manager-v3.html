@@ -2437,8 +2437,7 @@
         const cell = document.activeElement;
         if (!cell.classList.contains('cell-content')) return;
         // cut前のセル内容を保存して、どの行が切り取られたか特定する
-        // ※ textContentは<br>を無視するためinnerTextを使用
-        const beforeLines = cell.innerText.split('\n');
+        const beforeLines = cell.innerText.split('\n').filter(l => l.trim() !== '');
 
         // cut後のDOM更新を待ってから処理
         setTimeout(() => {
@@ -2448,7 +2447,7 @@
             .replace(/<br\s*\/?>/gi, '\n')
             .replace(/&nbsp;/gi, ' ').replace(/&lt;/gi, '<')
             .replace(/&gt;/gi, '>').replace(/&amp;/gi, '&')
-            .replace(/^\n/, '').replace(/\n$/, '');
+            .trim();
 
           const td = cell.closest('td');
           const rowIdx = parseInt(td?.dataset?.row);
@@ -2465,17 +2464,14 @@
           }
           detailRows[rowIdx][colId] = afterValue;
 
-          // 切り取られた行を特定（beforeとafterの差分）
-          const afterLines = afterValue.split('\n');
+          // 切り取られた行を特定（beforeとafterの差分、空行を除外して比較）
+          const afterLines = afterValue.split('\n').filter(l => l.trim() !== '');
           if (beforeLines.length > afterLines.length) {
             // 削除された行のインデックスを特定
             let removedLineIdx = -1;
             for (let i = 0; i < beforeLines.length; i++) {
-              if (beforeLines[i] !== (afterLines[i] || '')) {
-                // この行が完全に削除された場合か、部分的に編集された場合
-                if (afterLines.length < beforeLines.length) {
-                  removedLineIdx = i;
-                }
+              if (beforeLines[i].trim() !== (afterLines[i] || '').trim()) {
+                removedLineIdx = i;
                 break;
               }
             }
