@@ -1812,6 +1812,15 @@
     function handleCellClick(e, row, col) {
       e.stopPropagation();
 
+      // セル内のcontenteditable内でのクリックはテキスト編集を優先
+      if (e.target.classList.contains('cell-content') || e.target.closest('.cell-content')) {
+        // 既に同じセルが選択済みならテキスト編集モード（再描画しない）
+        if (selectedCells.length === 1 && selectedCells[0].row === row && selectedCells[0].col === col) {
+          highlightPdfCell(row, col);
+          return;
+        }
+      }
+
       if (e.ctrlKey || e.metaKey) {
         // Ctrl+クリック: 追加選択
         const idx = selectedCells.findIndex(c => c.row === row && c.col === col);
@@ -2011,6 +2020,12 @@
     let dragStart = null;
 
     function handleCellMouseDown(e, row, col) {
+      // セル内のcontenteditable内でのドラッグはテキスト選択を優先
+      if (e.target.classList.contains('cell-content') || e.target.closest('.cell-content')) {
+        if (selectedCells.length === 1 && selectedCells[0].row === row && selectedCells[0].col === col) {
+          return; // テキスト選択を妨げない
+        }
+      }
       if (e.button === 0 && !e.ctrlKey && !e.shiftKey) {
         isDragging = true;
         dragStart = { row, col };
@@ -2021,6 +2036,12 @@
 
     function handleCellMouseOver(e, row, col) {
       if (isDragging && dragStart) {
+        // セル内テキスト選択中はセル範囲選択をしない
+        if (e.target.classList.contains('cell-content') || e.target.closest('.cell-content')) {
+          if (selectedCells.length === 1 && selectedCells[0].row === row && selectedCells[0].col === col) {
+            return;
+          }
+        }
         selectRange(dragStart.row, dragStart.col, row, col);
         renderDetailTable();
       }
