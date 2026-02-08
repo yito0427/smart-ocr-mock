@@ -1222,6 +1222,7 @@
         setupResizers();
         setupCanvasEvents();
         setupKeyboardShortcuts();
+        setupPasteHandler();
         showToast('システムを初期化しました', 'success');
       } catch (e) {
         console.error('初期化エラー:', e);
@@ -2044,7 +2045,17 @@
     }
 
     function handleCellInput(e, row, colId) {
-      const value = e.target.textContent;
+      // innerHTML から改行を含むテキストを正しく取得（<br>やdivを\nに変換）
+      const html = e.target.innerHTML;
+      const value = html
+        .replace(/<div>/gi, '\n')
+        .replace(/<\/div>/gi, '')
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/&lt;/gi, '<')
+        .replace(/&gt;/gi, '>')
+        .replace(/&amp;/gi, '&')
+        .replace(/^\n/, ''); // 先頭の余分な改行を除去
       if (!detailRows[row].original) detailRows[row].original = {};
       if (detailRows[row].original[colId] === undefined) {
         detailRows[row].original[colId] = detailRows[row][colId];
@@ -2054,6 +2065,22 @@
     }
 
     function handleCellBlur(e, row, colId) {
+      // blur時にもinnerHTMLからデータを再取得して確実に同期
+      const html = e.target.innerHTML;
+      const value = html
+        .replace(/<div>/gi, '\n')
+        .replace(/<\/div>/gi, '')
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/&lt;/gi, '<')
+        .replace(/&gt;/gi, '>')
+        .replace(/&amp;/gi, '&')
+        .replace(/^\n/, '');
+      if (!detailRows[row].original) detailRows[row].original = {};
+      if (detailRows[row].original[colId] === undefined) {
+        detailRows[row].original[colId] = detailRows[row][colId];
+      }
+      detailRows[row][colId] = value;
       saveUndoState();
       renderDetailTable();
     }
@@ -2333,16 +2360,27 @@
       document.addEventListener('keydown', (e) => {
         if (currentScreen !== 'edit') return;
 
+        // セル編集中（contenteditable にフォーカス）はブラウザのネイティブ動作を使用
+        const isEditingCell = document.activeElement.classList.contains('cell-content');
+
         if (e.ctrlKey || e.metaKey) {
           if (e.key === 'a') {
-            e.preventDefault();
-            selectAllCells();
+            if (!isEditingCell) {
+              e.preventDefault();
+              selectAllCells();
+            }
           } else if (e.key === 'c') {
-            copyCells();
+            if (!isEditingCell) {
+              copyCells();
+            }
           } else if (e.key === 'x') {
-            cutCells();
+            if (!isEditingCell) {
+              cutCells();
+            }
           } else if (e.key === 'v') {
-            pasteCells();
+            if (!isEditingCell) {
+              pasteCells();
+            }
           } else if (e.key === 'z') {
             e.preventDefault();
             undo();
@@ -2359,6 +2397,17 @@
             e.preventDefault();
             moveSelection(e);
           }
+        }
+      });
+    }
+
+    // セル内ペースト時にプレーンテキストとして貼り付け（HTMLフォーマットを防止）
+    function setupPasteHandler() {
+      document.addEventListener('paste', (e) => {
+        if (document.activeElement.classList.contains('cell-content')) {
+          e.preventDefault();
+          const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+          document.execCommand('insertText', false, text);
         }
       });
     }
