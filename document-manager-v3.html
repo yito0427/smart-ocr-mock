@@ -2083,6 +2083,18 @@
       }
       detailRows[row][colId] = value;
       calculateFormulas(row);
+
+      // 改行がなくなったらmultilineクラスを外し、同じ行の全セルも更新
+      if (!value.includes('\n')) {
+        e.target.classList.remove('multiline');
+        // 同じ行の他セルのmultilineも更新
+        const tr = e.target.closest('tr');
+        if (tr) {
+          tr.querySelectorAll('.cell-content.multiline').forEach(cell => {
+            cell.classList.remove('multiline');
+          });
+        }
+      }
     }
 
     function handleCellBlur(e, row, colId) {
@@ -2430,6 +2442,45 @@
           const text = (e.clipboardData || window.clipboardData).getData('text/plain');
           document.execCommand('insertText', false, text);
         }
+      });
+
+      // セル内切り取り後に行の高さを自動調整
+      document.addEventListener('cut', (e) => {
+        const cell = document.activeElement;
+        if (!cell.classList.contains('cell-content')) return;
+        // cut後のDOM更新を待ってからmultilineクラスを更新
+        setTimeout(() => {
+          const html = cell.innerHTML;
+          const hasNewline = /<br|<div/i.test(html);
+          if (!hasNewline) {
+            cell.classList.remove('multiline');
+          }
+          // 同じ行の全セルも確認して更新
+          const tr = cell.closest('tr');
+          if (tr) {
+            const rowIdx = parseInt(cell.closest('td')?.dataset?.row);
+            if (!isNaN(rowIdx)) {
+              // データも同期
+              const colIdx = parseInt(cell.closest('td')?.dataset?.col);
+              const colId = detailColumns[colIdx]?.id;
+              if (colId) {
+                const value = html
+                  .replace(/<div>/gi, '\n').replace(/<\/div>/gi, '')
+                  .replace(/<br\s*\/?>/gi, '\n')
+                  .replace(/&nbsp;/gi, ' ').replace(/&lt;/gi, '<')
+                  .replace(/&gt;/gi, '>').replace(/&amp;/gi, '&')
+                  .replace(/^\n/, '');
+                detailRows[rowIdx][colId] = value;
+              }
+              // 行内に改行データが残っていなければ全セルからmultilineを除去
+              const rowData = detailRows[rowIdx];
+              const hasAnyMultiline = detailColumns.some(col => (rowData[col.id] || '').includes('\n'));
+              if (!hasAnyMultiline) {
+                tr.querySelectorAll('.cell-content.multiline').forEach(c => c.classList.remove('multiline'));
+              }
+            }
+          }
+        }, 0);
       });
     }
 
