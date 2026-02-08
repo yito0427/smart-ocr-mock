@@ -1811,13 +1811,10 @@
     function handleCellClick(e, row, col) {
       e.stopPropagation();
 
-      // セル内のcontenteditable内でのクリックはテキスト編集を優先
-      if (e.target.classList.contains('cell-content') || e.target.closest('.cell-content')) {
-        // 既に同じセルが選択済みならテキスト編集モード（再描画しない）
-        if (selectedCells.length === 1 && selectedCells[0].row === row && selectedCells[0].col === col) {
-          highlightPdfCell(row, col);
-          return;
-        }
+      // 同じセルの再クリック: テキスト編集モード（再描画せずハイライトのみ）
+      if (!clickIsNewCell && !e.ctrlKey && !e.shiftKey) {
+        highlightPdfCell(row, col);
+        return;
       }
 
       if (e.ctrlKey || e.metaKey) {
@@ -1833,7 +1830,7 @@
         // Shift+クリック: 範囲選択
         selectRange(selectionAnchor.row, selectionAnchor.col, row, col);
       } else {
-        // 通常クリック
+        // 通常クリック（新しいセルへの移動）
         selectedCells = [{ row, col }];
         selectionAnchor = { row, col };
       }
@@ -2018,13 +2015,19 @@
     let isDragging = false;
     let dragStart = null;
 
+    // mousedownからclickまでの間にセルが変わったかを追跡
+    let clickIsNewCell = false;
+
     function handleCellMouseDown(e, row, col) {
       // セル内のcontenteditable内でのドラッグはテキスト選択を優先
       if (e.target.classList.contains('cell-content') || e.target.closest('.cell-content')) {
         if (selectedCells.length === 1 && selectedCells[0].row === row && selectedCells[0].col === col) {
+          clickIsNewCell = false;
           return; // テキスト選択を妨げない
         }
       }
+      // 新しいセルへの移動かどうか判定
+      clickIsNewCell = !(selectedCells.length === 1 && selectedCells[0].row === row && selectedCells[0].col === col);
       if (e.button === 0 && !e.ctrlKey && !e.shiftKey) {
         isDragging = true;
         dragStart = { row, col };
