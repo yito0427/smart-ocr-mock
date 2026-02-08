@@ -2083,18 +2083,6 @@
       }
       detailRows[row][colId] = value;
       calculateFormulas(row);
-
-      // 改行がなくなったらmultilineクラスを外し、同じ行の全セルも更新
-      if (!value.includes('\n')) {
-        e.target.classList.remove('multiline');
-        // 同じ行の他セルのmultilineも更新
-        const tr = e.target.closest('tr');
-        if (tr) {
-          tr.querySelectorAll('.cell-content.multiline').forEach(cell => {
-            cell.classList.remove('multiline');
-          });
-        }
-      }
     }
 
     function handleCellBlur(e, row, colId) {
@@ -2444,42 +2432,78 @@
         }
       });
 
-      // セル内切り取り後に行の高さを自動調整
+      // セル内切り取り後に行の高さを自動調整（同じ行の他列も連動）
       document.addEventListener('cut', (e) => {
         const cell = document.activeElement;
         if (!cell.classList.contains('cell-content')) return;
-        // cut後のDOM更新を待ってからmultilineクラスを更新
+        // cut前のセル内容を保存して、どの行が切り取られたか特定する
+        const beforeLines = cell.textContent.split('\n');
+
+        // cut後のDOM更新を待ってから処理
         setTimeout(() => {
           const html = cell.innerHTML;
-          const hasNewline = /<br|<div/i.test(html);
-          if (!hasNewline) {
-            cell.classList.remove('multiline');
+          const afterValue = html
+            .replace(/<div>/gi, '\n').replace(/<\/div>/gi, '')
+            .replace(/<br\s*\/?>/gi, '\n')
+            .replace(/&nbsp;/gi, ' ').replace(/&lt;/gi, '<')
+            .replace(/&gt;/gi, '>').replace(/&amp;/gi, '&')
+            .replace(/^\n/, '').replace(/\n$/, '');
+
+          const td = cell.closest('td');
+          const rowIdx = parseInt(td?.dataset?.row);
+          const colIdx = parseInt(td?.dataset?.col);
+          if (isNaN(rowIdx) || isNaN(colIdx)) return;
+
+          const colId = detailColumns[colIdx]?.id;
+          if (!colId) return;
+
+          // データを更新
+          if (!detailRows[rowIdx].original) detailRows[rowIdx].original = {};
+          if (detailRows[rowIdx].original[colId] === undefined) {
+            detailRows[rowIdx].original[colId] = detailRows[rowIdx][colId];
           }
-          // 同じ行の全セルも確認して更新
-          const tr = cell.closest('tr');
-          if (tr) {
-            const rowIdx = parseInt(cell.closest('td')?.dataset?.row);
-            if (!isNaN(rowIdx)) {
-              // データも同期
-              const colIdx = parseInt(cell.closest('td')?.dataset?.col);
-              const colId = detailColumns[colIdx]?.id;
-              if (colId) {
-                const value = html
-                  .replace(/<div>/gi, '\n').replace(/<\/div>/gi, '')
-                  .replace(/<br\s*\/?>/gi, '\n')
-                  .replace(/&nbsp;/gi, ' ').replace(/&lt;/gi, '<')
-                  .replace(/&gt;/gi, '>').replace(/&amp;/gi, '&')
-                  .replace(/^\n/, '');
-                detailRows[rowIdx][colId] = value;
-              }
-              // 行内に改行データが残っていなければ全セルからmultilineを除去
-              const rowData = detailRows[rowIdx];
-              const hasAnyMultiline = detailColumns.some(col => (rowData[col.id] || '').includes('\n'));
-              if (!hasAnyMultiline) {
-                tr.querySelectorAll('.cell-content.multiline').forEach(c => c.classList.remove('multiline'));
+          detailRows[rowIdx][colId] = afterValue;
+
+          // 切り取られた行を特定（beforeとafterの差分）
+          const afterLines = afterValue.split('\n');
+          if (beforeLines.length > afterLines.length) {
+            // 削除された行のインデックスを特定
+            let removedLineIdx = -1;
+            for (let i = 0; i < beforeLines.length; i++) {
+              if (beforeLines[i] !== (afterLines[i] || '')) {
+                // この行が完全に削除された場合か、部分的に編集された場合
+                if (afterLines.length < beforeLines.length) {
+                  removedLineIdx = i;
+                }
+                break;
               }
             }
+            // 見つからなかった場合は最後の行が削除された
+            if (removedLineIdx === -1) {
+              removedLineIdx = beforeLines.length - 1;
+            }
+
+            // 同じ行の他の列からも対応する行を削除
+            detailColumns.forEach((col, cIdx) => {
+              if (cIdx === colIdx) return; // 編集中のセルはスキップ
+              const val = detailRows[rowIdx][col.id] || '';
+              if (val.includes('\n')) {
+                const lines = val.split('\n');
+                if (removedLineIdx < lines.length) {
+                  if (!detailRows[rowIdx].original) detailRows[rowIdx].original = {};
+                  if (detailRows[rowIdx].original[col.id] === undefined) {
+                    detailRows[rowIdx].original[col.id] = val;
+                  }
+                  lines.splice(removedLineIdx, 1);
+                  detailRows[rowIdx][col.id] = lines.join('\n');
+                }
+              }
+            });
           }
+
+          // 再描画して行の高さを更新
+          saveUndoState();
+          renderDetailTable();
         }, 0);
       });
     }
