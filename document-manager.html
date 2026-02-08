@@ -804,24 +804,6 @@
       outline-offset: -2px;
     }
 
-    .detail-table td textarea {
-      width: 100%;
-      border: none;
-      padding: 4px;
-      font-size: 13px;
-      font-family: inherit;
-      background: transparent;
-      resize: none;
-      overflow: hidden;
-      min-height: 24px;
-      line-height: 1.4;
-    }
-
-    .detail-table td textarea:focus {
-      outline: 2px solid var(--teal);
-      outline-offset: -2px;
-    }
-
     .detail-table td.readonly {
       background: var(--bg-light);
     }
@@ -2347,17 +2329,9 @@
     // 明細テーブル
     // ==========================================
     function initDetailTable() {
-      detailRows = [
-        { product: 'ノートパソコン', code: 'P001', price: '150000', qty: '2', amount: '' },
-        { product: 'モニター 27インチ', code: 'P002', price: '45000', qty: '4', amount: '' },
-        { product: 'キーボード（ワイヤレス）', code: 'P003', price: '8000', qty: '5', amount: '' },
-        { product: 'マウス（ワイヤレス）', code: 'P004', price: '3500', qty: '5', amount: '' },
-        { product: 'USBハブ 4ポート', code: 'P005', price: '2500', qty: '3', amount: '' },
-        { product: 'LANケーブル 5m', code: 'P006', price: '800', qty: '10', amount: '' },
-        { product: 'Webカメラ HD', code: 'P007', price: '12000', qty: '3', amount: '' },
-        { product: 'スピーカー', code: 'P008', price: '6500', qty: '2', amount: '' },
-        { product: 'ヘッドセット（ノイズキャンセリング）\n外付けSSD 1TB USB3.2対応', code: 'P009\nP010', price: '15000\n12000', qty: '2\n3', amount: '' },
-      ];
+      detailRows = Array(5).fill(null).map(() => ({
+        product: '', code: '', price: '', qty: '', amount: ''
+      }));
       renderDetailTable();
     }
 
@@ -2393,42 +2367,21 @@
             const isReadonly = col.formula ? 'readonly' : '';
             const cellClass = col.formula ? 'readonly' : '';
             const value = col.formula ? evaluateFormula(col.formula, row) : (row[col.id] || '');
-            const lineCount = String(value).split('\n').length;
-            const useTextarea = lineCount > 1;
-
-            if (useTextarea) {
-              return `
-                <td class="${cellClass}"
-                    data-cell-row="${rowIdx}"
-                    data-cell-col="${colIdx}"
-                    onmousedown="startCellSelection(${rowIdx}, ${colIdx}, event)"
-                    onmouseover="extendCellSelection(${rowIdx}, ${colIdx}, event)"
-                    onmouseup="endCellSelection(event)"
-                    oncontextmenu="showCellContextMenu(event, ${rowIdx}, ${colIdx})">
-                  <textarea rows="${lineCount}" ${isReadonly}
-                         data-row="${rowIdx}" data-col="${colIdx}"
-                         oninput="updateCellValue(${rowIdx}, '${col.id}', this.value)"
-                         onfocus="onCellFocus(${rowIdx}, ${colIdx})"
-                         onkeydown="handleCellKeydown(event, ${rowIdx}, ${colIdx})">${escapeHtml(value)}</textarea>
-                </td>
-              `;
-            } else {
-              return `
-                <td class="${cellClass}"
-                    data-cell-row="${rowIdx}"
-                    data-cell-col="${colIdx}"
-                    onmousedown="startCellSelection(${rowIdx}, ${colIdx}, event)"
-                    onmouseover="extendCellSelection(${rowIdx}, ${colIdx}, event)"
-                    onmouseup="endCellSelection(event)"
-                    oncontextmenu="showCellContextMenu(event, ${rowIdx}, ${colIdx})">
-                  <input type="text" value="${escapeHtml(value)}" ${isReadonly}
-                         data-row="${rowIdx}" data-col="${colIdx}"
-                         oninput="updateCellValue(${rowIdx}, '${col.id}', this.value)"
-                         onfocus="onCellFocus(${rowIdx}, ${colIdx})"
-                         onkeydown="handleCellKeydown(event, ${rowIdx}, ${colIdx})">
-                </td>
-              `;
-            }
+            return `
+              <td class="${cellClass}"
+                  data-cell-row="${rowIdx}"
+                  data-cell-col="${colIdx}"
+                  onmousedown="startCellSelection(${rowIdx}, ${colIdx}, event)"
+                  onmouseover="extendCellSelection(${rowIdx}, ${colIdx}, event)"
+                  onmouseup="endCellSelection(event)"
+                  oncontextmenu="showCellContextMenu(event, ${rowIdx}, ${colIdx})">
+                <input type="text" value="${value}" ${isReadonly}
+                       data-row="${rowIdx}" data-col="${colIdx}"
+                       oninput="updateCellValue(${rowIdx}, '${col.id}', this.value)"
+                       onfocus="onCellFocus(${rowIdx}, ${colIdx})"
+                       onkeydown="handleCellKeydown(event, ${rowIdx}, ${colIdx})">
+              </td>
+            `;
           }).join('')}
           <td class="row-actions">
             <button class="row-delete-btn" onclick="deleteRow(${rowIdx})">−</button>
@@ -2439,12 +2392,6 @@
 
       // マウスアップイベントをドキュメント全体に設定
       document.addEventListener('mouseup', endCellSelection);
-    }
-
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
     }
 
     function evaluateFormula(formula, row) {
