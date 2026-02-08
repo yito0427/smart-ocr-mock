@@ -1,0 +1,2915 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ドキュメント管理システム</title>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <style>
+    :root {
+      --bg-base: #fafafa;
+      --bg-white: #ffffff;
+      --bg-light: #f5f5f5;
+      --border-color: #e0e0e0;
+      --text-primary: #333333;
+      --text-secondary: #666666;
+      --teal: #008080;
+      --teal-light: #e0f2f1;
+      --teal-hover: #006666;
+      --mustard: #d4a017;
+      --mustard-light: #fff8e1;
+      --bengara: #8b2500;
+      --bengara-light: #ffebee;
+      --shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Segoe UI', 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      font-size: 14px;
+      line-height: 1.5;
+      overflow: hidden;
+    }
+
+    /* トースト通知 */
+    .toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .toast {
+      padding: 12px 20px;
+      border-radius: 6px;
+      box-shadow: var(--shadow);
+      animation: slideIn 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 250px;
+    }
+
+    .toast.success { background: var(--teal-light); border-left: 4px solid var(--teal); }
+    .toast.warning { background: var(--mustard-light); border-left: 4px solid var(--mustard); }
+    .toast.error { background: var(--bengara-light); border-left: 4px solid var(--bengara); color: var(--bengara); }
+
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    /* アプリレイアウト */
+    .app {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .app-header {
+      background: var(--bg-white);
+      border-bottom: 1px solid var(--border-color);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: var(--shadow);
+      z-index: 100;
+    }
+
+    .app-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--teal);
+    }
+
+    .main-content {
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .screen {
+      height: 100%;
+      display: none;
+    }
+
+    .screen.active {
+      display: flex;
+    }
+
+    /* ボタン */
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .btn-primary { background: var(--teal); color: white; }
+    .btn-primary:hover { background: var(--teal-hover); }
+    .btn-secondary { background: var(--bg-light); color: var(--text-primary); border: 1px solid var(--border-color); }
+    .btn-secondary:hover { background: var(--border-color); }
+    .btn-danger { background: var(--bengara); color: white; }
+
+    .btn-icon {
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      background: var(--bg-light);
+      border: 1px solid var(--border-color);
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    .btn-icon:hover { background: var(--teal-light); border-color: var(--teal); }
+    .btn-icon.active { background: var(--teal); color: white; }
+
+    .form-input {
+      padding: 8px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.2s;
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: var(--teal);
+      box-shadow: 0 0 0 3px var(--teal-light);
+    }
+
+    /* ドキュメント一覧画面 */
+    .list-screen {
+      flex-direction: column;
+    }
+
+    .list-toolbar {
+      padding: 12px 16px;
+      background: var(--bg-white);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .search-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      max-width: 400px;
+    }
+
+    .search-box .form-input { flex: 1; }
+
+    .list-container {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    .table-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-width: 400px;
+    }
+
+    .table-wrapper {
+      flex: 1;
+      overflow: auto;
+      background: var(--bg-white);
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .data-table th, .data-table td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+      white-space: nowrap;
+    }
+
+    .data-table th {
+      background: var(--bg-light);
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .data-table th:hover { background: var(--border-color); }
+    .data-table tbody tr { cursor: pointer; transition: background 0.15s; }
+    .data-table tbody tr:hover { background: var(--bg-light); }
+    .data-table tbody tr.selected { background: var(--teal-light); }
+
+    .resizer {
+      width: 6px;
+      background: var(--border-color);
+      cursor: col-resize;
+      flex-shrink: 0;
+    }
+
+    .resizer:hover { background: var(--teal); }
+
+    .preview-area {
+      width: 350px;
+      background: var(--bg-white);
+      border-left: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .preview-area.hidden { display: none; }
+
+    .preview-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-light);
+    }
+
+    .preview-content {
+      flex: 1;
+      padding: 16px;
+      overflow: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .preview-content canvas {
+      max-width: 100%;
+      max-height: 100%;
+      box-shadow: var(--shadow);
+    }
+
+    .status-bar {
+      padding: 8px 16px;
+      background: var(--bg-light);
+      border-top: 1px solid var(--border-color);
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    /* 編集画面 */
+    .edit-screen {
+      flex-direction: column;
+    }
+
+    .edit-header {
+      padding: 8px 16px;
+      background: var(--bg-white);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .edit-body {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* 左ツールバー */
+    .edit-toolbar {
+      width: 50px;
+      background: var(--bg-white);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 8px;
+      gap: 4px;
+    }
+
+    .tool-btn {
+      width: 36px;
+      height: 36px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      cursor: pointer;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .tool-btn:hover { background: var(--bg-light); }
+    .tool-btn.active { background: var(--teal); color: white; }
+
+    .tool-separator {
+      width: 30px;
+      height: 1px;
+      background: var(--border-color);
+      margin: 4px 0;
+    }
+
+    /* 中央プレビューエリア */
+    .preview-panel {
+      flex: 1;
+      background: #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-width: 250px;
+    }
+
+    .pdf-controls {
+      padding: 8px;
+      background: var(--bg-white);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .pdf-viewport {
+      flex: 1;
+      overflow: auto;
+      display: flex;
+      justify-content: flex-start;
+      align-items: flex-start;
+      padding: 0;
+    }
+
+    .canvas-container {
+      position: relative;
+    }
+
+    #pdfCanvas {
+      display: block;
+      background: white;
+    }
+
+    #drawCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    .ocr-selection {
+      position: absolute;
+      border: 2px dashed var(--teal);
+      background: rgba(0, 128, 128, 0.2);
+      pointer-events: none;
+      display: none;
+    }
+
+    #highlightLayer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+    }
+
+    .cell-highlight {
+      position: absolute;
+      background: rgba(0, 128, 128, 0.25);
+      border: 2px solid var(--teal);
+      border-radius: 2px;
+      pointer-events: none;
+    }
+
+    /* 右パネル */
+    .edit-panel {
+      width: 720px;
+      background: var(--bg-white);
+      border-left: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .panel-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .panel-tab {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      background: var(--bg-light);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .panel-tab.active {
+      background: var(--bg-white);
+      border-bottom: 2px solid var(--teal);
+      color: var(--teal);
+    }
+
+    .panel-content {
+      flex: 1;
+      overflow: auto;
+      padding: 16px;
+    }
+
+    /* 属性フォーム */
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      display: block;
+      margin-bottom: 4px;
+      font-weight: 500;
+      font-size: 13px;
+    }
+
+    .form-label .required {
+      color: var(--bengara);
+      margin-left: 2px;
+    }
+
+    .input-with-popup {
+      position: relative;
+    }
+
+    .input-with-popup .form-input {
+      width: 100%;
+      padding-right: 36px;
+    }
+
+    .popup-trigger {
+      position: absolute;
+      right: 4px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 28px;
+      height: 28px;
+      border: none;
+      background: var(--bg-light);
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .popup-trigger:hover { background: var(--teal-light); }
+
+    /* ポップオーバー */
+    .popover {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: var(--bg-white);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      z-index: 1000;
+      display: none;
+      max-height: 250px;
+      overflow: auto;
+    }
+
+    .popover.active { display: block; }
+
+    .popover-item {
+      padding: 10px 12px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .popover-item:hover { background: var(--teal-light); }
+    .popover-item:last-child { border-bottom: none; }
+
+    /* カレンダー */
+    .calendar {
+      padding: 12px;
+    }
+
+    .calendar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 2px;
+      text-align: center;
+    }
+
+    .calendar-day {
+      padding: 8px 4px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    .calendar-day:hover { background: var(--teal-light); }
+    .calendar-day.today { font-weight: bold; color: var(--teal); }
+    .calendar-day.selected { background: var(--teal); color: white; }
+    .calendar-day.other-month { color: #ccc; }
+
+    /* テンキー */
+    .numpad {
+      padding: 12px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .numpad-btn {
+      padding: 12px;
+      font-size: 18px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-white);
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .numpad-btn:hover { background: var(--teal-light); }
+    .numpad-btn.wide { grid-column: span 2; }
+
+    /* 明細テーブル */
+    .detail-section {
+      margin-top: 16px;
+    }
+
+    .detail-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    .detail-table-wrapper {
+      overflow: auto;
+      max-height: 400px;
+      background: var(--bg-base);
+    }
+
+    .detail-table {
+      border-collapse: separate;
+      border-spacing: 6px 2px;
+      font-size: 13px;
+      table-layout: fixed;
+    }
+
+    .detail-table th,
+    .detail-table td {
+      padding: 0;
+      position: relative;
+      white-space: nowrap;
+      vertical-align: top;
+    }
+
+    .detail-table thead th {
+      background: #fffbf0;
+      color: var(--text-primary);
+      font-weight: 500;
+      font-size: 12px;
+      padding: 8px 12px;
+      text-align: left;
+      border-bottom: 1px solid #e8e0d0;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      cursor: grab;
+      transition: background 0.15s, transform 0.15s;
+    }
+
+    .detail-table thead th:active {
+      cursor: grabbing;
+    }
+
+    .detail-table thead th.dragging {
+      opacity: 0.5;
+      background: #e8e0d0;
+    }
+
+    .detail-table thead th.drag-over {
+      background: var(--teal-light);
+      box-shadow: inset 0 0 0 2px var(--teal);
+    }
+
+    .detail-table thead th .col-header-content {
+      pointer-events: none;
+    }
+
+    .detail-table thead th.row-number-header {
+      background: #fffbf0;
+      width: 28px;
+      min-width: 28px;
+      padding: 8px 4px;
+    }
+
+    .detail-table thead th .col-resizer {
+      position: absolute;
+      right: -4px;
+      top: 0;
+      bottom: 0;
+      width: 9px;
+      cursor: col-resize;
+      background: transparent;
+      z-index: 10;
+    }
+
+    .detail-table thead th .col-resizer::after {
+      content: '';
+      position: absolute;
+      right: 4px;
+      top: 25%;
+      bottom: 25%;
+      width: 1px;
+      background: #ccc;
+      transition: all 0.15s;
+    }
+
+    .detail-table thead th .col-resizer:hover::after {
+      right: 3px;
+      width: 3px;
+      background: var(--teal);
+      border-radius: 2px;
+    }
+
+    .detail-table thead th:last-child .col-resizer {
+      display: none;
+    }
+
+    body.col-resizing .detail-table thead th .col-resizer::after {
+      width: 3px;
+      background: var(--teal);
+    }
+
+    body.col-resizing * {
+      cursor: col-resize !important;
+    }
+
+    .detail-table .row-number {
+      background: transparent;
+      color: var(--text-secondary);
+      width: 28px;
+      min-width: 28px;
+      text-align: center;
+      font-size: 11px;
+      padding: 8px 2px;
+      vertical-align: middle;
+    }
+
+    .detail-table td {
+      background: transparent;
+      height: 32px;
+      max-height: 32px;
+    }
+
+    .cell-content {
+      display: block;
+      padding: 5px 10px;
+      min-height: 26px;
+      line-height: 16px;
+      background: var(--bg-white);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      outline: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .cell-content.multiline {
+      white-space: pre-line;
+      height: auto;
+      overflow: visible;
+    }
+
+    .cell-content:focus {
+      border-color: var(--teal);
+      box-shadow: 0 0 0 3px var(--teal-light);
+    }
+
+    .detail-table td.selected .cell-content {
+      border-color: var(--teal);
+      box-shadow: 0 0 0 3px var(--teal-light);
+      background: #fff;
+    }
+
+    .detail-table td.modified .cell-content {
+      background: #fffef5;
+      border-color: var(--mustard);
+    }
+
+    .detail-table td.modified .cell-content::after {
+      content: '●';
+      position: absolute;
+      top: 4px;
+      right: 6px;
+      font-size: 8px;
+      color: var(--mustard);
+    }
+
+    .detail-table td.formula .cell-content {
+      background: var(--bg-light);
+      color: var(--text-secondary);
+    }
+
+    /* セル選択情報バー */
+
+    /* ページ区切り */
+    .page-break-row td {
+      background: transparent !important;
+      padding: 6px 0;
+    }
+
+    .page-break-label {
+      display: inline-block;
+      background: linear-gradient(180deg, #5ba2e0 0%, #4a90d9 100%);
+      color: white;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 5px 20px;
+      border-radius: 3px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+
+    /* ツールチップ */
+    .cell-tooltip {
+      position: fixed;
+      background: #333;
+      color: white;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      max-width: 300px;
+      word-break: break-all;
+      z-index: 10000;
+      pointer-events: none;
+      display: none;
+    }
+
+    /* OCRモードインジケーター */
+    .ocr-indicator {
+      position: fixed;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--teal);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .ocr-indicator.active { display: flex; }
+
+    /* OCRプログレス */
+    .ocr-progress {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 24px 32px;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      z-index: 10000;
+      text-align: center;
+      display: none;
+    }
+
+    .ocr-progress.active { display: block; }
+
+    .progress-bar {
+      width: 200px;
+      height: 8px;
+      background: var(--bg-light);
+      border-radius: 4px;
+      margin-top: 12px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--teal);
+      width: 0%;
+      transition: width 0.3s;
+    }
+
+    /* セル選択情報 */
+    .selection-info {
+      padding: 8px 16px;
+      background: var(--teal);
+      color: white;
+      font-size: 12px;
+      display: none;
+    }
+
+    .selection-info.active { display: block; }
+
+    /* カスタム属性 */
+    .custom-attrs {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .custom-attr-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+      align-items: center;
+    }
+
+    .custom-attr-row input {
+      flex: 1;
+    }
+
+    /* コンテキストメニュー */
+    .context-menu {
+      position: fixed;
+      background: var(--bg-white);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      z-index: 10000;
+      min-width: 150px;
+      display: none;
+    }
+
+    .context-menu.active { display: block; }
+
+    .context-menu-item {
+      padding: 10px 16px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .context-menu-item:hover { background: var(--teal-light); }
+    .context-menu-item.danger { color: var(--bengara); }
+  </style>
+</head>
+<body>
+  <div class="toast-container" id="toastContainer"></div>
+  <div class="cell-tooltip" id="cellTooltip"></div>
+
+  <div class="ocr-indicator" id="ocrIndicator">
+    <span>📷 画像上で領域をドラッグして選択してください</span>
+    <button class="btn btn-secondary" onclick="cancelOcrMode()">キャンセル</button>
+  </div>
+
+  <div class="ocr-progress" id="ocrProgress">
+    <div>🔍 OCR処理中...</div>
+    <div id="ocrStatus">初期化中...</div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="ocrProgressFill"></div>
+    </div>
+  </div>
+
+  <div class="context-menu" id="contextMenu">
+    <div class="context-menu-item" onclick="deleteColumn()">列を削除</div>
+  </div>
+
+  <div class="app">
+    <header class="app-header">
+      <div class="app-title">📄 ドキュメント管理システム</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary" id="undoBtn" onclick="undo()" disabled>↩ 元に戻す</button>
+        <button class="btn btn-secondary" id="redoBtn" onclick="redo()" disabled>↪ やり直し</button>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <!-- ドキュメント一覧画面 -->
+      <div class="screen list-screen active" id="listScreen">
+        <div class="list-toolbar">
+          <div class="search-box">
+            <input type="text" class="form-input" id="searchInput" placeholder="検索（スペース区切りでAND検索）">
+            <button class="btn btn-primary" onclick="searchDocuments()">検索</button>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <input type="file" id="fileInput" style="display:none" onchange="uploadFile(event)">
+            <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">📁 ファイル登録</button>
+            <button class="btn btn-danger" onclick="deleteSelected()">🗑 削除</button>
+            <button class="btn btn-secondary" id="togglePreviewBtn" onclick="togglePreview()">📋 プレビュー</button>
+          </div>
+        </div>
+
+        <div class="list-container">
+          <div class="table-area">
+            <div class="table-wrapper">
+              <table class="data-table" id="documentTable">
+                <thead>
+                  <tr>
+                    <th class="checkbox-cell"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
+                    <th onclick="sortTable('name')">ドキュメント名 <span class="sort-icon">↕</span></th>
+                    <th onclick="sortTable('partner')">取引先名 <span class="sort-icon">↕</span></th>
+                    <th onclick="sortTable('date')">取引日 <span class="sort-icon">↕</span></th>
+                    <th onclick="sortTable('amount')">取引金額 <span class="sort-icon">↕</span></th>
+                    <th onclick="sortTable('creator')">登録者 <span class="sort-icon">↕</span></th>
+                    <th onclick="sortTable('createdAt')">登録日時 <span class="sort-icon">↕</span></th>
+                    <th onclick="sortTable('updater')">最終更新者 <span class="sort-icon">↕</span></th>
+                    <th onclick="sortTable('updatedAt')">最終更新日時 <span class="sort-icon">↕</span></th>
+                  </tr>
+                </thead>
+                <tbody id="documentTableBody"></tbody>
+              </table>
+            </div>
+            <div class="status-bar" id="statusBar">0件のドキュメント</div>
+          </div>
+
+          <div class="resizer" id="listResizer"></div>
+
+          <div class="preview-area" id="previewArea">
+            <div class="preview-header">
+              <h3>プレビュー</h3>
+              <button class="btn-icon" onclick="togglePreview()">✕</button>
+            </div>
+            <div class="preview-content" id="previewContent">
+              <div style="color:#999;">ドキュメントを選択してください</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 編集画面 -->
+      <div class="screen edit-screen" id="editScreen">
+        <div class="edit-header">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <button class="btn btn-secondary" onclick="backToList()">← 戻る</button>
+            <h2 id="editTitle">ドキュメント編集</h2>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-primary" onclick="saveDocument()">💾 保存</button>
+          </div>
+        </div>
+
+        <div class="edit-body">
+          <!-- 左ツールバー -->
+          <div class="edit-toolbar">
+            <button class="tool-btn active" data-tool="select" onclick="setTool('select')" title="選択">🖱</button>
+            <button class="tool-btn" data-tool="pen" onclick="setTool('pen')" title="ペン">✏️</button>
+            <button class="tool-btn" data-tool="marker" onclick="setTool('marker')" title="マーカー">🖍</button>
+            <div class="tool-separator"></div>
+            <button class="tool-btn" data-tool="sticky" onclick="setTool('sticky')" title="付箋">📝</button>
+            <button class="tool-btn" data-tool="stamp" onclick="setTool('stamp')" title="スタンプ">📌</button>
+            <button class="tool-btn" data-tool="signature" onclick="setTool('signature')" title="署名">✍️</button>
+            <div class="tool-separator"></div>
+            <button class="tool-btn" id="ocrBtn" onclick="startOcrMode()" title="OCR読取">📷</button>
+          </div>
+
+          <!-- 中央プレビュー -->
+          <div class="preview-panel" id="previewPanel">
+            <div class="pdf-controls">
+              <button class="btn btn-secondary" onclick="prevPage()">◀ 前へ</button>
+              <span id="pageInfo">1 / 2</span>
+              <button class="btn btn-secondary" onclick="nextPage()">次へ ▶</button>
+              <span style="margin-left:16px;">ズーム:</span>
+              <button class="btn btn-secondary" onclick="zoomOut()">−</button>
+              <span id="zoomLevel">100%</span>
+              <button class="btn btn-secondary" onclick="zoomIn()">+</button>
+              <button class="btn btn-secondary" onclick="resetPdfView()" title="全体表示に戻す" style="margin-left:8px;">⊡ 全体</button>
+            </div>
+            <div class="pdf-viewport" id="pdfViewport">
+              <div class="canvas-container" id="canvasContainer">
+                <canvas id="pdfCanvas"></canvas>
+                <canvas id="drawCanvas"></canvas>
+                <div class="ocr-selection" id="ocrSelection"></div>
+                <div id="highlightLayer"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="resizer" id="previewResizer"></div>
+
+          <!-- 右パネル -->
+          <div class="edit-panel" id="editPanel">
+            <div class="panel-tabs">
+              <button class="panel-tab active" onclick="showPanelTab('attrs')">属性</button>
+              <button class="panel-tab" onclick="showPanelTab('details')">明細</button>
+            </div>
+
+            <div class="panel-content" id="attrsPanel">
+              <div class="form-group">
+                <label class="form-label">取引先名 <span class="required">*</span></label>
+                <div class="input-with-popup">
+                  <input type="text" class="form-input" id="partnerInput" placeholder="取引先名を入力">
+                  <button class="popup-trigger" onclick="togglePopover('partnerPopover')">▼</button>
+                  <div class="popover" id="partnerPopover"></div>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">取引日 <span class="required">*</span></label>
+                <div class="input-with-popup">
+                  <input type="text" class="form-input" id="dateInput" placeholder="yyyy-MM-dd">
+                  <button class="popup-trigger" onclick="togglePopover('calendarPopover')">📅</button>
+                  <div class="popover" id="calendarPopover">
+                    <div class="calendar" id="calendar"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">取引金額 <span class="required">*</span></label>
+                <div class="input-with-popup">
+                  <input type="text" class="form-input" id="amountInput" placeholder="¥0">
+                  <button class="popup-trigger" onclick="togglePopover('numpadPopover')">🔢</button>
+                  <div class="popover" id="numpadPopover">
+                    <div class="numpad">
+                      <button class="numpad-btn" onclick="numpadInput('7')">7</button>
+                      <button class="numpad-btn" onclick="numpadInput('8')">8</button>
+                      <button class="numpad-btn" onclick="numpadInput('9')">9</button>
+                      <button class="numpad-btn" onclick="numpadInput('4')">4</button>
+                      <button class="numpad-btn" onclick="numpadInput('5')">5</button>
+                      <button class="numpad-btn" onclick="numpadInput('6')">6</button>
+                      <button class="numpad-btn" onclick="numpadInput('1')">1</button>
+                      <button class="numpad-btn" onclick="numpadInput('2')">2</button>
+                      <button class="numpad-btn" onclick="numpadInput('3')">3</button>
+                      <button class="numpad-btn wide" onclick="numpadInput('0')">0</button>
+                      <button class="numpad-btn" onclick="numpadClear()">C</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="custom-attrs" id="customAttrs">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                  <span class="form-label">カスタム属性</span>
+                  <button class="btn btn-secondary" onclick="addCustomAttr()">+ 追加</button>
+                </div>
+                <div id="customAttrList"></div>
+              </div>
+            </div>
+
+            <div class="panel-content" id="detailsPanel" style="display:none;">
+              <div class="detail-section">
+                <div class="detail-toolbar">
+                  <button class="btn btn-secondary" onclick="addRowAbove()">↑ 上に行追加</button>
+                  <button class="btn btn-secondary" onclick="addRowBelow()">↓ 下に行追加</button>
+                  <button class="btn btn-secondary" onclick="deleteRow()">🗑 行削除</button>
+                  <button class="btn btn-secondary" onclick="addColumn()">+ 列追加</button>
+                  <button class="btn btn-secondary" onclick="addPageBreak()">📄 ページ区切り</button>
+                </div>
+
+                <div class="detail-table-wrapper" id="detailTableWrapper">
+                  <table class="detail-table" id="detailTable">
+                    <thead id="detailTableHead"></thead>
+                    <tbody id="detailTableBody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div class="selection-info" id="selectionInfo"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // ==========================================
+    // モックデータ
+    // ==========================================
+    const partners = ['株式会社ABC', '有限会社XYZ', '合同会社テスト', '山田商事株式会社', '鈴木工業'];
+    const products = [
+      { code: 'P001', name: 'ノートPC', price: 98000 },
+      { code: 'P002', name: 'モニター', price: 35000 },
+      { code: 'P003', name: 'キーボード', price: 8000 },
+      { code: 'P004', name: 'マウス', price: 3000 },
+      { code: 'P005', name: 'USBケーブル', price: 1500 }
+    ];
+
+    let documents = [
+      { id: 1, name: '請求書_202401.pdf', partner: '株式会社ABC', date: '2024-01-15', amount: 150000, creator: '田中太郎', createdAt: '2024-01-15 10:30', updater: '田中太郎', updatedAt: '2024-01-15 10:30' },
+      { id: 2, name: '見積書_202401.pdf', partner: '有限会社XYZ', date: '2024-01-20', amount: 280000, creator: '鈴木花子', createdAt: '2024-01-20 14:15', updater: '山田次郎', updatedAt: '2024-01-22 09:00' },
+      { id: 3, name: '納品書_202402.pdf', partner: '合同会社テスト', date: '2024-02-01', amount: 95000, creator: '佐藤三郎', createdAt: '2024-02-01 16:45', updater: '佐藤三郎', updatedAt: '2024-02-01 16:45' }
+    ];
+
+    // ==========================================
+    // 状態管理
+    // ==========================================
+    let currentScreen = 'list';
+    let selectedDocIds = new Set();
+    let currentDocId = null;
+    let sortColumn = null;
+    let sortAsc = true;
+    let previewVisible = true;
+
+    // 編集画面の状態
+    let currentTool = 'select';
+    let currentPage = 1;
+    let totalPages = 2;
+    let zoom = 1.5;
+    let isDrawing = false;
+    let lastX = 0, lastY = 0;
+
+    // 明細テーブル
+    let detailColumns = [
+      { id: 'productName', name: '商品名', width: 180 },
+      { id: 'productCode', name: '商品コード', width: 100 },
+      { id: 'unitPrice', name: '単価', width: 60 },
+      { id: 'quantity', name: '数量', width: 55 },
+      { id: 'amount', name: '金額', width: 70, formula: '{unitPrice}*{quantity}' }
+    ];
+
+    // PDF明細テーブルの座標定数（drawInvoiceと完全一致）
+    const PDF_TABLE = {
+      getStartY: (page) => page === 1 ? 195 : 30,  // ページ別の明細表開始Y
+      rowHeight: 20,    // 行の高さ
+      textOffsetY: 0,   // ハイライトは行全体をカバー
+      textHeight: 20,   // 行全体の高さ
+      cols: {
+        // drawInvoiceのfillText位置に合わせた座標
+        productName: { x: 50, w: 170 },   // 50〜220
+        productCode: { x: 220, w: 60 },   // 220〜280
+        unitPrice: { x: 280, w: 90 },     // 280〜370
+        quantity: { x: 370, w: 70 },      // 370〜440
+        amount: { x: 440, w: 110 }        // 440〜550
+      }
+    };
+
+    let detailRows = [
+      // 1ページ目: 9行（9行目はP009とP010を統合）
+      { productName: 'ビジネスノートパソコン 15.6インチ フルHD液晶', productCode: 'P001', unitPrice: '98000', quantity: '1', amount: '98000', page: 1, pdfRowIndex: 0, original: {}, ocrRegions: {} },
+      { productName: '液晶モニター27インチ4K対応', productCode: 'P002', unitPrice: '45000', quantity: '2', amount: '90000', page: 1, pdfRowIndex: 1, original: {}, ocrRegions: {} },
+      { productName: 'ワイヤレスキーボード 日本語配列 テンキー付き', productCode: 'P003', unitPrice: '8000', quantity: '3', amount: '24000', page: 1, pdfRowIndex: 2, original: {}, ocrRegions: {} },
+      { productName: 'ワイヤレスマウス（静音タイプ）', productCode: 'P004', unitPrice: '3500', quantity: '5', amount: '17500', page: 1, pdfRowIndex: 3, original: {}, ocrRegions: {} },
+      { productName: 'USBハブ4ポート USB3.0対応 セルフパワー', productCode: 'P005', unitPrice: '2000', quantity: '3', amount: '6000', page: 1, pdfRowIndex: 4, original: {}, ocrRegions: {} },
+      { productName: 'LANケーブル（カテゴリ6A）5m', productCode: 'P006', unitPrice: '1500', quantity: '10', amount: '15000', page: 1, pdfRowIndex: 5, original: {}, ocrRegions: {} },
+      { productName: 'ノートPCスタンド折りたたみ式', productCode: 'P007', unitPrice: '4500', quantity: '2', amount: '9000', page: 1, pdfRowIndex: 6, original: {}, ocrRegions: {} },
+      { productName: 'ウェブカメラ フルHD1080p対応 オートフォーカス', productCode: 'P008', unitPrice: '6800', quantity: '3', amount: '20400', page: 1, pdfRowIndex: 7, original: {}, ocrRegions: {} },
+      { productName: 'ヘッドセット（ノイズキャンセリング）\n外付けSSD 1TB USB3.2対応', productCode: 'P009\nP010', unitPrice: '12000\n15000', quantity: '2\n2', amount: '24000\n30000', page: 1, pdfRowIndex: 8, original: {}, ocrRegions: {} },
+      { pageBreak: true },
+      // 2ページ目: 15行
+      { productName: 'デスクトップPC ミニタワー型 第13世代Core i5', productCode: 'P011', unitPrice: '120000', quantity: '1', amount: '120000', page: 2, pdfRowIndex: 0, original: {}, ocrRegions: {} },
+      { productName: 'メモリ16GB DDR4-3200対応', productCode: 'P012', unitPrice: '8000', quantity: '4', amount: '32000', page: 2, pdfRowIndex: 1, original: {}, ocrRegions: {} },
+      { productName: '内蔵SSD 512GB NVMe M.2', productCode: 'P013', unitPrice: '7500', quantity: '3', amount: '22500', page: 2, pdfRowIndex: 2, original: {}, ocrRegions: {} },
+      { productName: 'グラフィックボード NVIDIA GeForce RTX4060', productCode: 'P014', unitPrice: '45000', quantity: '1', amount: '45000', page: 2, pdfRowIndex: 3, original: {}, ocrRegions: {} },
+      { productName: '電源ユニット750W 80PLUS', productCode: 'P015', unitPrice: '12000', quantity: '1', amount: '12000', page: 2, pdfRowIndex: 4, original: {}, ocrRegions: {} },
+      { productName: 'PCケース（ミドルタワー静音）', productCode: 'P016', unitPrice: '15000', quantity: '1', amount: '15000', page: 2, pdfRowIndex: 5, original: {}, ocrRegions: {} },
+      { productName: 'CPUクーラー（空冷式大型）', productCode: 'P017', unitPrice: '6000', quantity: '2', amount: '12000', page: 2, pdfRowIndex: 6, original: {}, ocrRegions: {} },
+      { productName: 'マザーボード ATX LGA1700対応 DDR5', productCode: 'P018', unitPrice: '25000', quantity: '1', amount: '25000', page: 2, pdfRowIndex: 7, original: {}, ocrRegions: {} },
+      { productName: 'サーマルグリス高性能タイプ', productCode: 'P019', unitPrice: '1500', quantity: '5', amount: '7500', page: 2, pdfRowIndex: 8, original: {}, ocrRegions: {} },
+      { productName: 'ケースファン120mm RGB対応', productCode: 'P020', unitPrice: '2500', quantity: '6', amount: '15000', page: 2, pdfRowIndex: 9, original: {}, ocrRegions: {} },
+      { productName: 'ファンコントローラー（PWM）', productCode: 'P021', unitPrice: '3500', quantity: '2', amount: '7000', page: 2, pdfRowIndex: 10, original: {}, ocrRegions: {} },
+      { productName: 'SATA電源ケーブル延長30cm', productCode: 'P022', unitPrice: '800', quantity: '5', amount: '4000', page: 2, pdfRowIndex: 11, original: {}, ocrRegions: {} },
+      { productName: 'ディスプレイポートケーブル2m', productCode: 'P023', unitPrice: '2000', quantity: '3', amount: '6000', page: 2, pdfRowIndex: 12, original: {}, ocrRegions: {} },
+      { productName: 'USB Type-Cハブ 7in1 HDMI SDカード対応', productCode: 'P024', unitPrice: '5500', quantity: '2', amount: '11000', page: 2, pdfRowIndex: 13, original: {}, ocrRegions: {} },
+      { productName: 'モニターアーム（デュアル対応）', productCode: 'P025', unitPrice: '8000', quantity: '1', amount: '8000', page: 2, pdfRowIndex: 14, original: {}, ocrRegions: {} }
+    ];
+
+    // 列ごとのPDF座標マッピング（デフォルト値）
+    const columnPdfPositions = PDF_TABLE.cols;
+
+    let selectedCells = [];
+    let selectionAnchor = null;
+    let currentHighlight = null; // 現在のハイライト情報
+
+    // OCR
+    let isOcrMode = false;
+    let ocrSelectionStart = null;
+    let isOcrSelecting = false;
+
+    // Undo/Redo
+    let undoStack = [];
+    let redoStack = [];
+
+    // ==========================================
+    // 初期化
+    // ==========================================
+    document.addEventListener('DOMContentLoaded', () => {
+      try {
+        renderDocumentTable();
+        initPartnerPopover();
+        initCalendar();
+        setupResizers();
+        setupCanvasEvents();
+        setupKeyboardShortcuts();
+        showToast('システムを初期化しました', 'success');
+      } catch (e) {
+        console.error('初期化エラー:', e);
+        showToast('初期化中にエラーが発生しました: ' + e.message, 'error');
+      }
+    });
+
+    // ==========================================
+    // トースト通知
+    // ==========================================
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.textContent = message;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }
+
+    // ==========================================
+    // ドキュメント一覧
+    // ==========================================
+    function renderDocumentTable() {
+      const tbody = document.getElementById('documentTableBody');
+      tbody.innerHTML = '';
+
+      documents.forEach(doc => {
+        const tr = document.createElement('tr');
+        tr.className = selectedDocIds.has(doc.id) ? 'selected' : '';
+        tr.innerHTML = `
+          <td class="checkbox-cell"><input type="checkbox" ${selectedDocIds.has(doc.id) ? 'checked' : ''} onchange="toggleSelect(${doc.id})"></td>
+          <td>${doc.name}</td>
+          <td>${doc.partner}</td>
+          <td>${doc.date}</td>
+          <td>¥${doc.amount.toLocaleString()}</td>
+          <td>${doc.creator}</td>
+          <td>${doc.createdAt}</td>
+          <td>${doc.updater}</td>
+          <td>${doc.updatedAt}</td>
+        `;
+        tr.onclick = (e) => {
+          if (e.target.type !== 'checkbox') {
+            selectRow(doc.id);
+          }
+        };
+        tr.ondblclick = () => openEditor(doc.id);
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('statusBar').textContent = `${documents.length}件のドキュメント`;
+    }
+
+    function toggleSelect(id) {
+      if (selectedDocIds.has(id)) {
+        selectedDocIds.delete(id);
+      } else {
+        selectedDocIds.add(id);
+      }
+      renderDocumentTable();
+      updatePreview();
+    }
+
+    function toggleSelectAll() {
+      const selectAll = document.getElementById('selectAll').checked;
+      selectedDocIds = selectAll ? new Set(documents.map(d => d.id)) : new Set();
+      renderDocumentTable();
+    }
+
+    function selectRow(id) {
+      selectedDocIds = new Set([id]);
+      renderDocumentTable();
+      updatePreview();
+    }
+
+    function deleteSelected() {
+      if (selectedDocIds.size === 0) {
+        showToast('削除するドキュメントを選択してください', 'warning');
+        return;
+      }
+      if (confirm(`${selectedDocIds.size}件のドキュメントを削除しますか？`)) {
+        documents = documents.filter(d => !selectedDocIds.has(d.id));
+        selectedDocIds.clear();
+        renderDocumentTable();
+        showToast('削除しました', 'success');
+      }
+    }
+
+    function searchDocuments() {
+      const query = document.getElementById('searchInput').value.toLowerCase();
+      const keywords = query.split(/\s+/).filter(k => k);
+
+      if (keywords.length === 0) {
+        renderDocumentTable();
+        return;
+      }
+
+      const filtered = documents.filter(doc => {
+        const text = `${doc.name} ${doc.partner} ${doc.date}`.toLowerCase();
+        return keywords.every(k => text.includes(k));
+      });
+
+      const tbody = document.getElementById('documentTableBody');
+      tbody.innerHTML = '';
+      filtered.forEach(doc => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="checkbox-cell"><input type="checkbox" onchange="toggleSelect(${doc.id})"></td>
+          <td>${doc.name}</td>
+          <td>${doc.partner}</td>
+          <td>${doc.date}</td>
+          <td>¥${doc.amount.toLocaleString()}</td>
+          <td>${doc.creator}</td>
+          <td>${doc.createdAt}</td>
+          <td>${doc.updater}</td>
+          <td>${doc.updatedAt}</td>
+        `;
+        tr.onclick = () => selectRow(doc.id);
+        tr.ondblclick = () => openEditor(doc.id);
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('statusBar').textContent = `${filtered.length}件のドキュメント (検索結果)`;
+      showToast(`${filtered.length}件見つかりました`, 'success');
+    }
+
+    function sortTable(column) {
+      if (sortColumn === column) {
+        sortAsc = !sortAsc;
+      } else {
+        sortColumn = column;
+        sortAsc = true;
+      }
+
+      documents.sort((a, b) => {
+        let va = a[column], vb = b[column];
+        if (column === 'amount') {
+          va = Number(va); vb = Number(vb);
+        }
+        if (va < vb) return sortAsc ? -1 : 1;
+        if (va > vb) return sortAsc ? 1 : -1;
+        return 0;
+      });
+
+      renderDocumentTable();
+      showToast(`${column}で並び替えました`, 'success');
+    }
+
+    function togglePreview() {
+      previewVisible = !previewVisible;
+      document.getElementById('previewArea').classList.toggle('hidden', !previewVisible);
+      document.getElementById('togglePreviewBtn').textContent = previewVisible ? '📋 プレビュー' : '📋 プレビュー表示';
+    }
+
+    function updatePreview() {
+      const content = document.getElementById('previewContent');
+      if (selectedDocIds.size === 1) {
+        const id = [...selectedDocIds][0];
+        const doc = documents.find(d => d.id === id);
+        content.innerHTML = '<canvas id="previewCanvas" width="200" height="280"></canvas>';
+        drawInvoicePreview(document.getElementById('previewCanvas'), doc, 0.4);
+      } else {
+        content.innerHTML = '<div style="color:#999;">ドキュメントを選択してください</div>';
+      }
+    }
+
+    function uploadFile(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const newDoc = {
+          id: Date.now(),
+          name: file.name,
+          partner: '',
+          date: new Date().toISOString().slice(0, 10),
+          amount: 0,
+          creator: 'ユーザー',
+          createdAt: new Date().toLocaleString('ja-JP'),
+          updater: 'ユーザー',
+          updatedAt: new Date().toLocaleString('ja-JP')
+        };
+        documents.push(newDoc);
+        renderDocumentTable();
+        showToast(`${file.name} を登録しました`, 'success');
+      }
+    }
+
+    // ==========================================
+    // 編集画面
+    // ==========================================
+    function openEditor(id) {
+      currentDocId = id;
+      const doc = documents.find(d => d.id === id);
+      document.getElementById('editTitle').textContent = doc ? doc.name : '新規ドキュメント';
+      document.getElementById('partnerInput').value = doc ? doc.partner : '';
+      document.getElementById('dateInput').value = doc ? doc.date : '';
+      document.getElementById('amountInput').value = doc ? `¥${doc.amount.toLocaleString()}` : '';
+
+      document.getElementById('listScreen').classList.remove('active');
+      document.getElementById('editScreen').classList.add('active');
+      currentScreen = 'edit';
+
+      renderPdfCanvas();
+      renderDetailTable();
+      showToast('編集画面を開きました', 'success');
+    }
+
+    function backToList() {
+      document.getElementById('editScreen').classList.remove('active');
+      document.getElementById('listScreen').classList.add('active');
+      currentScreen = 'list';
+      cancelOcrMode();
+    }
+
+    function saveDocument() {
+      const partner = document.getElementById('partnerInput').value;
+      const date = document.getElementById('dateInput').value;
+      const amount = parseInt(document.getElementById('amountInput').value.replace(/[¥,]/g, '')) || 0;
+
+      if (!partner || !date || !amount) {
+        showToast('必須項目を入力してください', 'error');
+        return;
+      }
+
+      if (currentDocId) {
+        const doc = documents.find(d => d.id === currentDocId);
+        if (doc) {
+          doc.partner = partner;
+          doc.date = date;
+          doc.amount = amount;
+          doc.updater = 'ユーザー';
+          doc.updatedAt = new Date().toLocaleString('ja-JP');
+        }
+      }
+
+      showToast('保存しました', 'success');
+    }
+
+    // ==========================================
+    // PDFキャンバス描画
+    // ==========================================
+    function renderPdfCanvas() {
+      const pdfCanvas = document.getElementById('pdfCanvas');
+      const drawCanvas = document.getElementById('drawCanvas');
+      const viewport = document.getElementById('pdfViewport');
+      const ctx = pdfCanvas.getContext('2d');
+
+      const baseWidth = 595;
+      const baseHeight = 842;
+
+      // viewportサイズに合わせて自動スケール
+      const viewportWidth = viewport.clientWidth;
+      const viewportHeight = viewport.clientHeight;
+      const fitScale = Math.min(viewportWidth / baseWidth, viewportHeight / baseHeight, 3.0);
+      const actualZoom = zoom * fitScale;
+
+      pdfCanvas.width = baseWidth * actualZoom;
+      pdfCanvas.height = baseHeight * actualZoom;
+      drawCanvas.width = pdfCanvas.width;
+      drawCanvas.height = pdfCanvas.height;
+
+      ctx.scale(actualZoom, actualZoom);
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, baseWidth, baseHeight);
+
+      drawInvoice(ctx, currentPage);
+      document.getElementById('pageInfo').textContent = `${currentPage} / ${totalPages}`;
+      document.getElementById('zoomLevel').textContent = `${Math.round(zoom * 100)}%`;
+    }
+
+    function drawInvoice(ctx, page) {
+      ctx.fillStyle = '#333';
+
+      // 2ページ目は鑑なし、上部から明細表開始
+      const tableStartY = page === 1 ? 195 : 30;
+
+      if (page === 1) {
+        // 1ページ目のみ：鑑（ヘッダー情報）
+        ctx.font = 'bold 24px sans-serif';
+        ctx.fillText('請　求　書', 230, 60);
+
+        ctx.font = '12px sans-serif';
+        ctx.fillText(`発行日: 2024-01-15`, 420, 40);
+        ctx.fillText(`請求番号: INV-2024-001`, 420, 55);
+
+        ctx.font = '14px sans-serif';
+        ctx.fillText('株式会社ABC 御中', 50, 100);
+
+        ctx.font = '12px sans-serif';
+        ctx.fillText('下記の通りご請求申し上げます。', 50, 140);
+
+        ctx.font = 'bold 16px sans-serif';
+        ctx.fillText('ご請求金額: ¥675,900-', 50, 170);
+      }
+
+      // 明細表ヘッダー
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(50, tableStartY, 500, 25);
+      ctx.fillStyle = '#f0f0f0';
+      ctx.fillRect(50, tableStartY, 500, 25);
+      ctx.fillStyle = '#333';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.fillText('商品名', 55, tableStartY + 17);
+      ctx.fillText('コード', 220, tableStartY + 17);
+      ctx.fillText('単価', 285, tableStartY + 17);
+      ctx.fillText('数量', 370, tableStartY + 17);
+      ctx.fillText('金額', 450, tableStartY + 17);
+
+      // 明細行（1ページ目: 10行、2ページ目: 15行）
+      ctx.font = '7px sans-serif';
+      const items = page === 1 ? [
+        ['ビジネスノートパソコン 15.6インチ フルHD液晶', 'P001', '¥98,000', '1', '¥98,000'],
+        ['液晶モニター27インチ4K対応', 'P002', '¥45,000', '2', '¥90,000'],
+        ['ワイヤレスキーボード 日本語配列 テンキー付き', 'P003', '¥8,000', '3', '¥24,000'],
+        ['ワイヤレスマウス（静音タイプ）', 'P004', '¥3,500', '5', '¥17,500'],
+        ['USBハブ4ポート USB3.0対応 セルフパワー', 'P005', '¥2,000', '3', '¥6,000'],
+        ['LANケーブル（カテゴリ6A）5m', 'P006', '¥1,500', '10', '¥15,000'],
+        ['ノートPCスタンド折りたたみ式', 'P007', '¥4,500', '2', '¥9,000'],
+        ['ウェブカメラ フルHD1080p対応 オートフォーカス', 'P008', '¥6,800', '3', '¥20,400'],
+        ['ヘッドセット（ノイズキャンセリング）', 'P009', '¥12,000', '2', '¥24,000'],
+        ['外付けSSD 1TB USB3.2対応', 'P010', '¥15,000', '2', '¥30,000']
+      ] : [
+        ['デスクトップPC ミニタワー型 第13世代Core i5', 'P011', '¥120,000', '1', '¥120,000'],
+        ['メモリ16GB DDR4-3200対応', 'P012', '¥8,000', '4', '¥32,000'],
+        ['内蔵SSD 512GB NVMe M.2', 'P013', '¥7,500', '3', '¥22,500'],
+        ['グラフィックボード NVIDIA GeForce RTX4060', 'P014', '¥45,000', '1', '¥45,000'],
+        ['電源ユニット750W 80PLUS', 'P015', '¥12,000', '1', '¥12,000'],
+        ['PCケース（ミドルタワー静音）', 'P016', '¥15,000', '1', '¥15,000'],
+        ['CPUクーラー（空冷式大型）', 'P017', '¥6,000', '2', '¥12,000'],
+        ['マザーボード ATX LGA1700対応 DDR5', 'P018', '¥25,000', '1', '¥25,000'],
+        ['サーマルグリス高性能タイプ', 'P019', '¥1,500', '5', '¥7,500'],
+        ['ケースファン120mm RGB対応', 'P020', '¥2,500', '6', '¥15,000'],
+        ['ファンコントローラー（PWM）', 'P021', '¥3,500', '2', '¥7,000'],
+        ['SATA電源ケーブル延長30cm', 'P022', '¥800', '5', '¥4,000'],
+        ['ディスプレイポートケーブル2m', 'P023', '¥2,000', '3', '¥6,000'],
+        ['USB Type-Cハブ 7in1 HDMI SDカード対応', 'P024', '¥5,500', '2', '¥11,000'],
+        ['モニターアーム（デュアル対応）', 'P025', '¥8,000', '1', '¥8,000']
+      ];
+
+      items.forEach((item, i) => {
+        const y = tableStartY + 25 + i * 20;
+        ctx.strokeRect(50, y, 500, 20);
+        ctx.fillText(item[0], 55, y + 14);
+        ctx.fillText(item[1], 220, y + 14);
+        ctx.fillText(item[2], 280, y + 14);
+        ctx.fillText(item[3], 370, y + 14);
+        ctx.fillText(item[4], 440, y + 14);
+      });
+
+      if (page === 2) {
+        const lastRowY = tableStartY + 25 + items.length * 20;
+        ctx.font = 'bold 12px sans-serif';
+        ctx.fillText('合計: ¥675,900', 420, lastRowY + 25);
+      }
+
+      // 発行者情報
+      ctx.font = '11px sans-serif';
+      ctx.fillText('〒100-0001 東京都千代田区○○1-2-3', 350, 750);
+      ctx.fillText('山田商事株式会社', 350, 770);
+      ctx.fillText('TEL: 03-1234-5678', 350, 790);
+    }
+
+    function drawInvoicePreview(canvas, doc, scale) {
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.scale(scale, scale);
+      ctx.fillStyle = '#333';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillText('請求書', 170, 40);
+      ctx.font = '10px sans-serif';
+      ctx.fillText(doc?.partner || '', 30, 70);
+    }
+
+    function prevPage() {
+      if (currentPage > 1) {
+        currentPage--;
+        renderPdfCanvas();
+        showToast(`${currentPage}ページ目を表示`, 'success');
+      }
+    }
+
+    function nextPage() {
+      if (currentPage < totalPages) {
+        currentPage++;
+        renderPdfCanvas();
+        showToast(`${currentPage}ページ目を表示`, 'success');
+      }
+    }
+
+    function zoomIn() {
+      zoom = Math.min(zoom + 0.1, 2);
+      renderPdfCanvas();
+    }
+
+    function zoomOut() {
+      zoom = Math.max(zoom - 0.1, 0.5);
+      renderPdfCanvas();
+    }
+
+    // ==========================================
+    // ツール
+    // ==========================================
+    function setTool(tool) {
+      currentTool = tool;
+      document.querySelectorAll('.tool-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tool === tool);
+      });
+      document.getElementById('drawCanvas').style.cursor = tool === 'select' ? 'default' : 'crosshair';
+      showToast(`${tool}ツールを選択`, 'success');
+    }
+
+    function setupCanvasEvents() {
+      const drawCanvas = document.getElementById('drawCanvas');
+
+      drawCanvas.addEventListener('mousedown', (e) => {
+        if (isOcrMode) {
+          startOcrSelection(e);
+        } else if (currentTool !== 'select') {
+          startDrawing(e);
+        }
+      });
+
+      drawCanvas.addEventListener('mousemove', (e) => {
+        if (isOcrMode && isOcrSelecting) {
+          updateOcrSelection(e);
+        } else if (isDrawing) {
+          draw(e);
+        }
+      });
+
+      drawCanvas.addEventListener('mouseup', (e) => {
+        if (isOcrMode && isOcrSelecting) {
+          endOcrSelection(e);
+        } else {
+          isDrawing = false;
+        }
+      });
+
+      drawCanvas.addEventListener('mouseleave', () => {
+        isDrawing = false;
+      });
+    }
+
+    function startDrawing(e) {
+      isDrawing = true;
+      const rect = e.target.getBoundingClientRect();
+      lastX = e.clientX - rect.left;
+      lastY = e.clientY - rect.top;
+
+      if (currentTool === 'sticky') {
+        drawSticky(lastX, lastY);
+        isDrawing = false;
+      } else if (currentTool === 'stamp') {
+        drawStamp(lastX, lastY);
+        isDrawing = false;
+      } else if (currentTool === 'signature') {
+        drawSignature(lastX, lastY);
+        isDrawing = false;
+      }
+    }
+
+    function draw(e) {
+      if (!isDrawing) return;
+      const ctx = document.getElementById('drawCanvas').getContext('2d');
+      const rect = e.target.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(x, y);
+      ctx.strokeStyle = currentTool === 'pen' ? '#000' : '#ffff00';
+      ctx.lineWidth = currentTool === 'pen' ? 2 : 20;
+      ctx.globalAlpha = currentTool === 'marker' ? 0.4 : 1;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      lastX = x;
+      lastY = y;
+    }
+
+    function drawSticky(x, y) {
+      const text = prompt('付箋のテキスト:');
+      if (!text) return;
+      const ctx = document.getElementById('drawCanvas').getContext('2d');
+      ctx.fillStyle = '#fff740';
+      ctx.fillRect(x, y, 120, 60);
+      ctx.strokeStyle = '#e6d800';
+      ctx.strokeRect(x, y, 120, 60);
+      ctx.fillStyle = '#333';
+      ctx.font = '11px sans-serif';
+      ctx.fillText(text.slice(0, 15), x + 5, y + 20);
+    }
+
+    function drawStamp(x, y) {
+      const ctx = document.getElementById('drawCanvas').getContext('2d');
+      ctx.beginPath();
+      ctx.arc(x, y, 25, 0, Math.PI * 2);
+      ctx.strokeStyle = '#c00';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = '#c00';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.fillText('確認済', x - 20, y + 5);
+    }
+
+    function drawSignature(x, y) {
+      const ctx = document.getElementById('drawCanvas').getContext('2d');
+      ctx.fillStyle = '#000';
+      ctx.font = 'italic 16px serif';
+      ctx.fillText('署名', x, y);
+    }
+
+    // ==========================================
+    // 明細テーブル
+    // ==========================================
+    function renderDetailTable() {
+      const thead = document.getElementById('detailTableHead');
+      const tbody = document.getElementById('detailTableBody');
+
+      // ヘッダー行（列名を表示、ドラッグ&ドロップで並び替え可能）
+      let headerHtml = '<tr><th class="row-number-header">#</th>';
+      detailColumns.forEach((col, idx) => {
+        headerHtml += `<th style="width:${col.width}px;max-width:${col.width}px;"
+                          draggable="true"
+                          ondragstart="handleColDragStart(event,${idx})"
+                          ondragover="handleColDragOver(event,${idx})"
+                          ondragenter="handleColDragEnter(event,${idx})"
+                          ondragleave="handleColDragLeave(event)"
+                          ondrop="handleColDrop(event,${idx})"
+                          ondragend="handleColDragEnd(event)">
+          <span class="col-header-content">${col.name}</span>
+          <span class="col-resizer" onmousedown="startColResize(event,${idx})" ondblclick="autoFitColumn(${idx})" title="ダブルクリックで自動調整"></span>
+        </th>`;
+      });
+      headerHtml += '</tr>';
+      thead.innerHTML = headerHtml;
+
+      // ボディ
+      let bodyHtml = '';
+      let rowNum = 1;
+      let pageNum = 2; // ページ区切り後のページ番号
+      detailRows.forEach((row, rowIdx) => {
+        if (row.pageBreak) {
+          bodyHtml += `<tr class="page-break-row"><td colspan="${detailColumns.length + 1}"><span class="page-break-label">${pageNum}ページ</span></td></tr>`;
+          pageNum++;
+          return;
+        }
+
+        bodyHtml += '<tr>';
+        bodyHtml += `<td class="row-number">${rowNum}</td>`;
+        detailColumns.forEach((col, colIdx) => {
+          const rawValue = row[col.id] || '';
+          const isMultiline = rawValue.includes('\n');
+          const value = isMultiline ? rawValue.replace(/\n/g, '<br>') : rawValue;
+          const isModified = row.original?.[col.id] !== undefined && row.original[col.id] !== rawValue;
+          const isFormula = col.formula;
+          const cellClass = [
+            isModified ? 'modified' : '',
+            isFormula ? 'formula' : '',
+            selectedCells.some(c => c.row === rowIdx && c.col === colIdx) ? 'selected' : ''
+          ].filter(Boolean).join(' ');
+          const multilineClass = isMultiline ? ' multiline' : '';
+
+          bodyHtml += `<td class="${cellClass}" data-row="${rowIdx}" data-col="${colIdx}" style="width:${col.width}px;max-width:${col.width}px;"
+                          onclick="handleCellClick(event,${rowIdx},${colIdx})"
+                          onmousedown="handleCellMouseDown(event,${rowIdx},${colIdx})"
+                          onmouseover="handleCellMouseOver(event,${rowIdx},${colIdx})"
+                          onmouseenter="showCellTooltip(event,${rowIdx},${colIdx})"
+                          onmouseleave="hideCellTooltip()"
+                          oncontextmenu="showColumnMenu(event,${colIdx})">
+                        <div class="cell-content${multilineClass}"
+                             contenteditable="${!isFormula}"
+                             oninput="handleCellInput(event,${rowIdx},'${col.id}')"
+                             onblur="handleCellBlur(event,${rowIdx},'${col.id}')">${value}</div>
+                      </td>`;
+        });
+        bodyHtml += '</tr>';
+        rowNum++;
+      });
+      tbody.innerHTML = bodyHtml;
+
+      updateSelectionInfo();
+    }
+
+    function handleCellClick(e, row, col) {
+      e.stopPropagation();
+
+      if (e.ctrlKey || e.metaKey) {
+        // Ctrl+クリック: 追加選択
+        const idx = selectedCells.findIndex(c => c.row === row && c.col === col);
+        if (idx >= 0) {
+          selectedCells.splice(idx, 1);
+        } else {
+          selectedCells.push({ row, col });
+        }
+        selectionAnchor = { row, col };
+      } else if (e.shiftKey && selectionAnchor) {
+        // Shift+クリック: 範囲選択
+        selectRange(selectionAnchor.row, selectionAnchor.col, row, col);
+      } else {
+        // 通常クリック
+        selectedCells = [{ row, col }];
+        selectionAnchor = { row, col };
+      }
+
+      renderDetailTable();
+      highlightPdfCell(row, col);
+      // 選択セルが見えるようにスクロール
+      setTimeout(() => scrollDetailTableToCell(row, col), 0);
+    }
+
+    // PDFプレビュー上のセルハイライトと拡大フォーカス
+    function highlightPdfCell(row, col) {
+      const rowData = detailRows[row];
+      if (!rowData || rowData.pageBreak) return;
+
+      const colDef = detailColumns[col];
+      if (!colDef) return;
+
+      // OCR領域があればそれを使用、なければデフォルト座標
+      const ocrRegion = rowData.ocrRegions?.[colDef.id];
+      const colPos = columnPdfPositions[colDef.id];
+
+      let cellX, cellY, cellW, cellH, cellPage;
+
+      if (ocrRegion) {
+        // OCRで取得した領域を使用
+        cellX = ocrRegion.x;
+        cellY = ocrRegion.y;
+        cellW = ocrRegion.w;
+        cellH = ocrRegion.h;
+        cellPage = ocrRegion.page;
+      } else if (colPos && rowData.pdfRowIndex !== undefined) {
+        // デフォルト座標を使用（PDF_TABLEから計算、ページ別の開始位置）
+        const tableStartY = PDF_TABLE.getStartY(rowData.page);
+        const rowY = tableStartY + 25 + rowData.pdfRowIndex * PDF_TABLE.rowHeight;
+        cellX = colPos.x;
+        cellY = rowY + PDF_TABLE.textOffsetY;
+        cellW = colPos.w;
+        cellH = PDF_TABLE.textHeight;
+        cellPage = rowData.page;
+      } else {
+        return;
+      }
+
+      // ページ切り替えが必要な場合
+      const needPageSwitch = cellPage && cellPage !== currentPage;
+      if (needPageSwitch) {
+        currentPage = cellPage;
+      }
+
+      // 確認しやすいズームレベルに設定（2.5倍）
+      const detailZoom = 2.5;
+      if (zoom !== detailZoom || needPageSwitch) {
+        zoom = detailZoom;
+        renderPdfCanvas();
+      }
+
+      // ハイライト表示とスクロール（描画完了後に実行）
+      // setTimeoutで確実にキャンバス描画完了を待つ
+      setTimeout(() => {
+        renderCellHighlight(cellX, cellY, cellW, cellH);
+        // スクロールは別タイミングで実行（ハイライト描画後）
+        requestAnimationFrame(() => {
+          scrollToPdfCell(cellX, cellY, cellW, cellH);
+        });
+      }, 100);
+    }
+
+    function renderCellHighlight(x, y, w, h) {
+      const layer = document.getElementById('highlightLayer');
+      const canvas = document.getElementById('pdfCanvas');
+      layer.innerHTML = '';
+
+      // キャンバスの実際のサイズからズーム倍率を算出（ビューポート依存を排除）
+      const baseWidth = 595;
+      const actualZoom = canvas.width / baseWidth;
+
+      const div = document.createElement('div');
+      div.className = 'cell-highlight';
+      div.style.left = (x * actualZoom) + 'px';
+      div.style.top = (y * actualZoom) + 'px';
+      div.style.width = (w * actualZoom) + 'px';
+      div.style.height = (h * actualZoom) + 'px';
+      layer.appendChild(div);
+    }
+
+    // PDFビューポートを該当セルにスクロール（セルを中央に表示）
+    function scrollToPdfCell(x, y, w, h) {
+      const viewport = document.getElementById('pdfViewport');
+      const canvas = document.getElementById('pdfCanvas');
+      const viewportWidth = viewport.clientWidth;
+      const viewportHeight = viewport.clientHeight;
+
+      // キャンバスの実際のサイズからズーム倍率を算出（renderCellHighlightと一致）
+      const baseWidth = 595;
+      const actualZoom = canvas.width / baseWidth;
+
+      // セルの座標をスクリーン座標に変換
+      const cellLeft = x * actualZoom;
+      const cellTop = y * actualZoom;
+      const cellWidth = w * actualZoom;
+      const cellHeight = h * actualZoom;
+
+      // セルの中心座標
+      const cellCenterX = cellLeft + cellWidth / 2;
+      const cellCenterY = cellTop + cellHeight / 2;
+
+      // セルの中心がビューポートの中央に来るようにスクロール
+      let scrollX = cellCenterX - viewportWidth / 2;
+      let scrollY = cellCenterY - viewportHeight / 2;
+
+      // キャンバスの範囲外にスクロールしないように制限
+      const maxScrollX = Math.max(0, canvas.width - viewportWidth);
+      const maxScrollY = Math.max(0, canvas.height - viewportHeight);
+      scrollX = Math.max(0, Math.min(scrollX, maxScrollX));
+      scrollY = Math.max(0, Math.min(scrollY, maxScrollY));
+
+      // 即座にスクロール
+      viewport.scrollTo({
+        left: scrollX,
+        top: scrollY,
+        behavior: 'instant'
+      });
+    }
+
+    function clearCellHighlight() {
+      const layer = document.getElementById('highlightLayer');
+      if (layer) layer.innerHTML = '';
+    }
+
+    // 明細テーブルの選択セルをスクロールして表示
+    function scrollDetailTableToCell(rowIdx, colIdx) {
+      const wrapper = document.getElementById('detailTableWrapper');
+      const cell = document.querySelector(`.detail-table td[data-row="${rowIdx}"][data-col="${colIdx}"]`);
+      if (!wrapper || !cell) return;
+
+      const tr = cell.closest('tr');
+      if (!tr) return;
+
+      // テーブル内での行の位置を取得（offsetTopはtable基準）
+      const thead = wrapper.querySelector('thead');
+      const headerHeight = thead ? thead.offsetHeight : 40;
+
+      // 行の位置（wrapper内のスクロール位置を考慮）
+      const rowTop = tr.offsetTop;
+      const rowHeight = tr.offsetHeight;
+
+      // 可視領域の範囲
+      const visibleTop = wrapper.scrollTop + headerHeight;
+      const visibleBottom = wrapper.scrollTop + wrapper.clientHeight;
+
+      // 縦スクロール
+      if (rowTop < visibleTop) {
+        // 行が上に隠れている → 行が見えるまで上にスクロール
+        wrapper.scrollTop = rowTop - headerHeight - 5;
+      } else if (rowTop + rowHeight > visibleBottom) {
+        // 行が下に隠れている → 行が見えるまで下にスクロール
+        wrapper.scrollTop = rowTop + rowHeight - wrapper.clientHeight + 5;
+      }
+
+      // 横スクロール（セル単位）
+      const cellLeft = cell.offsetLeft;
+      const cellWidth = cell.offsetWidth;
+      const visibleLeft = wrapper.scrollLeft;
+      const visibleRight = wrapper.scrollLeft + wrapper.clientWidth;
+
+      if (cellLeft < visibleLeft) {
+        wrapper.scrollLeft = cellLeft - 5;
+      } else if (cellLeft + cellWidth > visibleRight) {
+        wrapper.scrollLeft = cellLeft + cellWidth - wrapper.clientWidth + 5;
+      }
+    }
+
+    // 全体表示に戻す
+    function resetPdfView() {
+      zoom = 1.5;
+      clearCellHighlight();
+      renderPdfCanvas();
+      document.getElementById('pdfViewport').scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    }
+
+    let isDragging = false;
+    let dragStart = null;
+
+    function handleCellMouseDown(e, row, col) {
+      if (e.button === 0 && !e.ctrlKey && !e.shiftKey) {
+        isDragging = true;
+        dragStart = { row, col };
+        selectedCells = [{ row, col }];
+        selectionAnchor = { row, col };
+      }
+    }
+
+    function handleCellMouseOver(e, row, col) {
+      if (isDragging && dragStart) {
+        selectRange(dragStart.row, dragStart.col, row, col);
+        renderDetailTable();
+      }
+    }
+
+    document.addEventListener('mouseup', () => {
+      isDragging = false;
+      dragStart = null;
+    });
+
+    function selectRange(r1, c1, r2, c2) {
+      const minR = Math.min(r1, r2), maxR = Math.max(r1, r2);
+      const minC = Math.min(c1, c2), maxC = Math.max(c1, c2);
+      selectedCells = [];
+      for (let r = minR; r <= maxR; r++) {
+        if (!detailRows[r]?.pageBreak) {
+          for (let c = minC; c <= maxC; c++) {
+            selectedCells.push({ row: r, col: c });
+          }
+        }
+      }
+    }
+
+    function handleCellInput(e, row, colId) {
+      const value = e.target.textContent;
+      if (!detailRows[row].original) detailRows[row].original = {};
+      if (detailRows[row].original[colId] === undefined) {
+        detailRows[row].original[colId] = detailRows[row][colId];
+      }
+      detailRows[row][colId] = value;
+      calculateFormulas(row);
+    }
+
+    function handleCellBlur(e, row, colId) {
+      saveUndoState();
+      renderDetailTable();
+    }
+
+    function calculateFormulas(row) {
+      detailColumns.forEach(col => {
+        if (col.formula) {
+          let formula = col.formula;
+          detailColumns.forEach(c => {
+            const regex = new RegExp(`\\{${c.id}\\}`, 'g');
+            formula = formula.replace(regex, parseFloat(detailRows[row][c.id]) || 0);
+          });
+          try {
+            detailRows[row][col.id] = String(eval(formula));
+          } catch (e) {
+            detailRows[row][col.id] = 'ERROR';
+          }
+        }
+      });
+    }
+
+    function updateSelectionInfo() {
+      const info = document.getElementById('selectionInfo');
+      if (selectedCells.length > 0) {
+        const rows = new Set(selectedCells.map(c => c.row)).size;
+        const cols = new Set(selectedCells.map(c => c.col)).size;
+        info.textContent = `${selectedCells.length}個のセル選択中 (${rows}行×${cols}列)`;
+        info.classList.add('active');
+      } else {
+        info.classList.remove('active');
+      }
+    }
+
+    function showCellTooltip(e, row, col) {
+      const colDef = detailColumns[col];
+      const value = detailRows[row]?.[colDef?.id] || '';
+      if (value.length > 10) {
+        const tooltip = document.getElementById('cellTooltip');
+        tooltip.textContent = value;
+        tooltip.style.left = (e.pageX + 10) + 'px';
+        tooltip.style.top = (e.pageY + 10) + 'px';
+        tooltip.style.display = 'block';
+      }
+    }
+
+    function hideCellTooltip() {
+      document.getElementById('cellTooltip').style.display = 'none';
+    }
+
+    // 行操作
+    function addRowAbove() {
+      if (selectedCells.length === 0) {
+        showToast('セルを選択してください', 'warning');
+        return;
+      }
+      const row = Math.min(...selectedCells.map(c => c.row));
+      const refRow = detailRows[row] || {};
+      const newRow = { productName: '', productCode: '', unitPrice: '', quantity: '', amount: '', page: refRow.page || 1, pdfRowIndex: refRow.pdfRowIndex || 0, original: {}, ocrRegions: {} };
+      detailRows.splice(row, 0, newRow);
+      saveUndoState();
+      renderDetailTable();
+      showToast('行を追加しました', 'success');
+    }
+
+    function addRowBelow() {
+      if (selectedCells.length === 0) {
+        showToast('セルを選択してください', 'warning');
+        return;
+      }
+      const row = Math.max(...selectedCells.map(c => c.row));
+      const refRow = detailRows[row] || {};
+      const newRow = { productName: '', productCode: '', unitPrice: '', quantity: '', amount: '', page: refRow.page || 1, pdfRowIndex: (refRow.pdfRowIndex || 0) + 1, original: {}, ocrRegions: {} };
+      detailRows.splice(row + 1, 0, newRow);
+      saveUndoState();
+      renderDetailTable();
+      showToast('行を追加しました', 'success');
+    }
+
+    function deleteRow() {
+      if (selectedCells.length === 0) {
+        showToast('セルを選択してください', 'warning');
+        return;
+      }
+      const rows = [...new Set(selectedCells.map(c => c.row))].sort((a, b) => b - a);
+      rows.forEach(r => {
+        if (!detailRows[r]?.pageBreak) {
+          detailRows.splice(r, 1);
+        }
+      });
+      selectedCells = [];
+      saveUndoState();
+      renderDetailTable();
+      showToast('行を削除しました', 'success');
+    }
+
+    function addColumn() {
+      const name = prompt('列名を入力:');
+      if (!name) return;
+      const id = 'col_' + Date.now();
+      detailColumns.push({ id, name, width: 100 });
+      detailRows.forEach(row => {
+        if (!row.pageBreak) row[id] = '';
+      });
+      saveUndoState();
+      renderDetailTable();
+      showToast('列を追加しました', 'success');
+    }
+
+    let contextMenuColIdx = null;
+    function showColumnMenu(e, colIdx) {
+      e.preventDefault();
+      contextMenuColIdx = colIdx;
+      const menu = document.getElementById('contextMenu');
+      menu.style.left = e.pageX + 'px';
+      menu.style.top = e.pageY + 'px';
+      menu.classList.add('active');
+    }
+
+    document.addEventListener('click', () => {
+      document.getElementById('contextMenu').classList.remove('active');
+    });
+
+    function deleteColumn() {
+      if (contextMenuColIdx !== null && detailColumns.length > 1) {
+        const col = detailColumns[contextMenuColIdx];
+        detailColumns.splice(contextMenuColIdx, 1);
+        detailRows.forEach(row => delete row[col.id]);
+        saveUndoState();
+        renderDetailTable();
+        showToast('列を削除しました', 'success');
+      }
+    }
+
+    // ==========================================
+    // 列ドラッグ＆ドロップ並び替え
+    // ==========================================
+    let dragColIdx = null;
+    let dragOverColIdx = null;
+
+    function handleColDragStart(e, idx) {
+      dragColIdx = idx;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', idx.toString());
+
+      // ドラッグ中のスタイルを適用
+      requestAnimationFrame(() => {
+        e.target.classList.add('dragging');
+      });
+    }
+
+    function handleColDragOver(e, idx) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    }
+
+    function handleColDragEnter(e, idx) {
+      e.preventDefault();
+      if (dragColIdx !== null && dragColIdx !== idx) {
+        // 前のドラッグオーバー要素からクラスを削除
+        document.querySelectorAll('.detail-table thead th.drag-over').forEach(th => {
+          th.classList.remove('drag-over');
+        });
+        e.target.closest('th').classList.add('drag-over');
+        dragOverColIdx = idx;
+      }
+    }
+
+    function handleColDragLeave(e) {
+      // 子要素への移動の場合は無視
+      if (e.target.closest('th') && !e.target.closest('th').contains(e.relatedTarget)) {
+        e.target.closest('th').classList.remove('drag-over');
+      }
+    }
+
+    function handleColDrop(e, idx) {
+      e.preventDefault();
+
+      // 全てのdrag-overクラスを削除
+      document.querySelectorAll('.detail-table thead th.drag-over').forEach(th => {
+        th.classList.remove('drag-over');
+      });
+
+      if (dragColIdx !== null && dragColIdx !== idx) {
+        // 列を移動
+        const col = detailColumns.splice(dragColIdx, 1)[0];
+        detailColumns.splice(idx, 0, col);
+
+        // detailRowsのデータ順序も対応（キーベースなので順序変更不要だがPDF座標マッピングを更新）
+        saveUndoState();
+        renderDetailTable();
+        showToast('列を移動しました', 'success');
+      }
+
+      dragColIdx = null;
+      dragOverColIdx = null;
+    }
+
+    function handleColDragEnd(e) {
+      // 全てのドラッグ関連クラスを削除
+      document.querySelectorAll('.detail-table thead th').forEach(th => {
+        th.classList.remove('dragging', 'drag-over');
+      });
+
+      dragColIdx = null;
+      dragOverColIdx = null;
+    }
+
+    let resizeColIdx = null;
+    let resizeStartX = 0;
+    let resizeStartWidth = 0;
+
+    function startColResize(e, idx) {
+      e.stopPropagation();
+      e.preventDefault();
+      resizeColIdx = idx;
+      resizeStartX = e.pageX;
+      resizeStartWidth = detailColumns[idx].width;
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+
+      // ドラッグ中のビジュアルフィードバック
+      document.body.classList.add('col-resizing');
+
+      document.addEventListener('mousemove', doColResize);
+      document.addEventListener('mouseup', stopColResize);
+    }
+
+    function doColResize(e) {
+      if (resizeColIdx !== null) {
+        const diff = e.pageX - resizeStartX;
+        detailColumns[resizeColIdx].width = Math.max(50, resizeStartWidth + diff);
+        renderDetailTable();
+      }
+    }
+
+    function stopColResize() {
+      resizeColIdx = null;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      document.body.classList.remove('col-resizing');
+      document.removeEventListener('mousemove', doColResize);
+      document.removeEventListener('mouseup', stopColResize);
+    }
+
+    // ダブルクリックで列幅を自動調整
+    function autoFitColumn(idx) {
+      const colId = detailColumns[idx].id;
+      let maxWidth = detailColumns[idx].name.length * 12 + 24; // ヘッダー幅
+
+      detailRows.forEach(row => {
+        if (row.pageBreak) return;
+        const val = String(row[colId] || '');
+        const width = val.length * 10 + 24;
+        if (width > maxWidth) maxWidth = width;
+      });
+
+      detailColumns[idx].width = Math.max(50, Math.min(300, maxWidth));
+      renderDetailTable();
+    }
+
+    function addPageBreak() {
+      if (selectedCells.length === 0) {
+        showToast('セルを選択してください', 'warning');
+        return;
+      }
+      const row = Math.max(...selectedCells.map(c => c.row));
+      detailRows.splice(row + 1, 0, { pageBreak: true });
+      saveUndoState();
+      renderDetailTable();
+      showToast('ページ区切りを追加しました', 'success');
+    }
+
+    // ==========================================
+    // キーボードショートカット
+    // ==========================================
+    function setupKeyboardShortcuts() {
+      document.addEventListener('keydown', (e) => {
+        if (currentScreen !== 'edit') return;
+
+        if (e.ctrlKey || e.metaKey) {
+          if (e.key === 'a') {
+            e.preventDefault();
+            selectAllCells();
+          } else if (e.key === 'c') {
+            copyCells();
+          } else if (e.key === 'x') {
+            cutCells();
+          } else if (e.key === 'v') {
+            pasteCells();
+          } else if (e.key === 'z') {
+            e.preventDefault();
+            undo();
+          } else if (e.key === 'y') {
+            e.preventDefault();
+            redo();
+          }
+        } else if (e.key === 'Delete') {
+          clearSelectedCells();
+        } else if (e.key === 'Escape') {
+          cancelOcrMode();
+        } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter'].includes(e.key)) {
+          if (selectedCells.length > 0 && !document.activeElement.classList.contains('cell-content')) {
+            e.preventDefault();
+            moveSelection(e);
+          }
+        }
+      });
+    }
+
+    function selectAllCells() {
+      selectedCells = [];
+      detailRows.forEach((row, rowIdx) => {
+        if (!row.pageBreak) {
+          detailColumns.forEach((col, colIdx) => {
+            selectedCells.push({ row: rowIdx, col: colIdx });
+          });
+        }
+      });
+      renderDetailTable();
+      showToast('全セルを選択しました', 'success');
+    }
+
+    let clipboard = [];
+    function copyCells() {
+      if (selectedCells.length === 0) return;
+      clipboard = selectedCells.map(c => ({
+        value: detailRows[c.row]?.[detailColumns[c.col]?.id] || '',
+        relRow: c.row - selectedCells[0].row,
+        relCol: c.col - selectedCells[0].col
+      }));
+      showToast('コピーしました', 'success');
+    }
+
+    function cutCells() {
+      copyCells();
+      clearSelectedCells();
+      showToast('切り取りました', 'success');
+    }
+
+    function pasteCells() {
+      if (clipboard.length === 0 || selectedCells.length === 0) return;
+      const base = selectedCells[0];
+      clipboard.forEach(item => {
+        const r = base.row + item.relRow;
+        const c = base.col + item.relCol;
+        if (detailRows[r] && detailColumns[c] && !detailColumns[c].formula) {
+          if (!detailRows[r].original) detailRows[r].original = {};
+          if (detailRows[r].original[detailColumns[c].id] === undefined) {
+            detailRows[r].original[detailColumns[c].id] = detailRows[r][detailColumns[c].id];
+          }
+          detailRows[r][detailColumns[c].id] = item.value;
+          calculateFormulas(r);
+        }
+      });
+      saveUndoState();
+      renderDetailTable();
+      showToast('貼り付けました', 'success');
+    }
+
+    function clearSelectedCells() {
+      selectedCells.forEach(c => {
+        const col = detailColumns[c.col];
+        if (col && !col.formula && detailRows[c.row]) {
+          if (!detailRows[c.row].original) detailRows[c.row].original = {};
+          if (detailRows[c.row].original[col.id] === undefined) {
+            detailRows[c.row].original[col.id] = detailRows[c.row][col.id];
+          }
+          detailRows[c.row][col.id] = '';
+        }
+      });
+      saveUndoState();
+      renderDetailTable();
+    }
+
+    function moveSelection(e) {
+      if (selectedCells.length === 0) return;
+      const current = selectedCells[selectedCells.length - 1];
+      let newRow = current.row, newCol = current.col;
+
+      if (e.key === 'ArrowUp') {
+        newRow = Math.max(0, newRow - 1);
+      } else if (e.key === 'ArrowDown') {
+        newRow = Math.min(detailRows.length - 1, newRow + 1);
+      } else if (e.key === 'ArrowLeft') {
+        if (newCol === 0) {
+          // 一番左の列で←キー → 一つ上の行の一番右の列へ
+          if (newRow > 0) {
+            newRow = newRow - 1;
+            newCol = detailColumns.length - 1;
+          }
+        } else {
+          newCol = newCol - 1;
+        }
+      } else if (e.key === 'ArrowRight' || e.key === 'Tab') {
+        if (newCol === detailColumns.length - 1) {
+          // 一番右の列で→キー → 一つ下の行の一番左の列へ
+          if (newRow < detailRows.length - 1) {
+            newRow = newRow + 1;
+            newCol = 0;
+          }
+        } else {
+          newCol = newCol + 1;
+        }
+      } else if (e.key === 'Enter') {
+        newRow = Math.min(detailRows.length - 1, newRow + 1);
+      }
+
+      // Shift+→で次ページへ
+      if (e.shiftKey && e.key === 'ArrowRight') {
+        nextPage();
+        return;
+      }
+
+      // pageBreak行をスキップ
+      while (detailRows[newRow]?.pageBreak) {
+        if (e.key === 'ArrowUp' || (e.key === 'ArrowLeft' && current.col === 0)) {
+          newRow = newRow - 1;
+        } else {
+          newRow = newRow + 1;
+        }
+        // 範囲外に出たら元に戻す
+        if (newRow < 0 || newRow >= detailRows.length) {
+          newRow = current.row;
+          newCol = current.col;
+          break;
+        }
+      }
+
+      if (e.shiftKey) {
+        selectRange(selectionAnchor.row, selectionAnchor.col, newRow, newCol);
+      } else {
+        selectedCells = [{ row: newRow, col: newCol }];
+        selectionAnchor = { row: newRow, col: newCol };
+      }
+      renderDetailTable();
+
+      // キーボード移動でもPDFハイライトを更新＆明細テーブルをスクロール
+      if (selectedCells.length === 1) {
+        const { row, col } = selectedCells[0];
+        highlightPdfCell(row, col);
+        setTimeout(() => scrollDetailTableToCell(row, col), 0);
+      }
+    }
+
+    // ==========================================
+    // Undo/Redo
+    // ==========================================
+    function saveUndoState() {
+      undoStack.push(JSON.stringify(detailRows));
+      if (undoStack.length > 50) undoStack.shift();
+      redoStack = [];
+      updateUndoRedoButtons();
+    }
+
+    function undo() {
+      if (undoStack.length === 0) return;
+      redoStack.push(JSON.stringify(detailRows));
+      detailRows = JSON.parse(undoStack.pop());
+      renderDetailTable();
+      updateUndoRedoButtons();
+      showToast('元に戻しました', 'success');
+    }
+
+    function redo() {
+      if (redoStack.length === 0) return;
+      undoStack.push(JSON.stringify(detailRows));
+      detailRows = JSON.parse(redoStack.pop());
+      renderDetailTable();
+      updateUndoRedoButtons();
+      showToast('やり直しました', 'success');
+    }
+
+    function updateUndoRedoButtons() {
+      document.getElementById('undoBtn').disabled = undoStack.length === 0;
+      document.getElementById('redoBtn').disabled = redoStack.length === 0;
+    }
+
+    // ==========================================
+    // OCR機能
+    // ==========================================
+    function startOcrMode() {
+      if (selectedCells.length === 0) {
+        showToast('先に明細テーブルのセルを選択してください', 'warning');
+        return;
+      }
+      isOcrMode = true;
+      document.getElementById('ocrIndicator').classList.add('active');
+      document.getElementById('ocrBtn').classList.add('active');
+      document.getElementById('drawCanvas').style.cursor = 'crosshair';
+
+      const rows = new Set(selectedCells.map(c => c.row)).size;
+      showToast(`OCRモード: ${selectedCells.length}セル (${rows}行) を選択中`, 'success');
+    }
+
+    function cancelOcrMode() {
+      isOcrMode = false;
+      isOcrSelecting = false;
+      ocrSelectionStart = null;
+      document.getElementById('ocrIndicator').classList.remove('active');
+      document.getElementById('ocrBtn').classList.remove('active');
+      document.getElementById('ocrSelection').style.display = 'none';
+      document.getElementById('drawCanvas').style.cursor = currentTool === 'select' ? 'default' : 'crosshair';
+    }
+
+    function startOcrSelection(e) {
+      const container = document.getElementById('canvasContainer');
+      const rect = container.getBoundingClientRect();
+      ocrSelectionStart = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      };
+      isOcrSelecting = true;
+      const selection = document.getElementById('ocrSelection');
+      selection.style.display = 'block';
+      selection.style.left = ocrSelectionStart.x + 'px';
+      selection.style.top = ocrSelectionStart.y + 'px';
+      selection.style.width = '0px';
+      selection.style.height = '0px';
+    }
+
+    function updateOcrSelection(e) {
+      if (!isOcrSelecting || !ocrSelectionStart) return;
+      const container = document.getElementById('canvasContainer');
+      const rect = container.getBoundingClientRect();
+      const currentX = e.clientX - rect.left;
+      const currentY = e.clientY - rect.top;
+
+      const selection = document.getElementById('ocrSelection');
+      const left = Math.min(ocrSelectionStart.x, currentX);
+      const top = Math.min(ocrSelectionStart.y, currentY);
+      const width = Math.abs(currentX - ocrSelectionStart.x);
+      const height = Math.abs(currentY - ocrSelectionStart.y);
+
+      selection.style.left = left + 'px';
+      selection.style.top = top + 'px';
+      selection.style.width = width + 'px';
+      selection.style.height = height + 'px';
+    }
+
+    async function endOcrSelection(e) {
+      if (!isOcrSelecting || !ocrSelectionStart) return;
+
+      const container = document.getElementById('canvasContainer');
+      const rect = container.getBoundingClientRect();
+      const endX = e.clientX - rect.left;
+      const endY = e.clientY - rect.top;
+
+      const left = Math.min(ocrSelectionStart.x, endX);
+      const top = Math.min(ocrSelectionStart.y, endY);
+      const width = Math.abs(endX - ocrSelectionStart.x);
+      const height = Math.abs(endY - ocrSelectionStart.y);
+
+      isOcrSelecting = false;
+
+      if (width < 10 || height < 10) {
+        document.getElementById('ocrSelection').style.display = 'none';
+        return;
+      }
+
+      await performOcr(left, top, width, height);
+      document.getElementById('ocrSelection').style.display = 'none';
+      cancelOcrMode();
+    }
+
+    async function performOcr(x, y, width, height) {
+      const pdfCanvas = document.getElementById('pdfCanvas');
+      const viewport = document.getElementById('pdfViewport');
+
+      // 実際のスケールを計算してPDF座標に変換
+      const baseWidth = 595;
+      const baseHeight = 842;
+      const viewportWidth = viewport.clientWidth;
+      const viewportHeight = viewport.clientHeight;
+      const fitScale = Math.min(viewportWidth / baseWidth, viewportHeight / baseHeight, 3.0);
+      const actualZoom = zoom * fitScale;
+
+      // 画面座標からPDF座標に変換
+      const pdfX = x / actualZoom;
+      const pdfY = y / actualZoom;
+      const pdfW = width / actualZoom;
+      const pdfH = height / actualZoom;
+
+      // OCR領域情報を保存用に記録
+      const ocrRegionInfo = {
+        x: pdfX,
+        y: pdfY,
+        w: pdfW,
+        h: pdfH,
+        page: currentPage
+      };
+
+      // 選択領域を切り出し
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = width;
+      tempCanvas.height = height;
+      const tempCtx = tempCanvas.getContext('2d');
+      tempCtx.drawImage(pdfCanvas, x, y, width, height, 0, 0, width, height);
+
+      const progress = document.getElementById('ocrProgress');
+      const progressFill = document.getElementById('ocrProgressFill');
+      const status = document.getElementById('ocrStatus');
+      progress.classList.add('active');
+      progressFill.style.width = '0%';
+      status.textContent = '初期化中...';
+
+      try {
+        const imageData = tempCanvas.toDataURL('image/png');
+
+        const result = await Tesseract.recognize(imageData, 'jpn+eng', {
+          logger: (m) => {
+            if (m.status === 'recognizing text') {
+              const pct = Math.round(m.progress * 100);
+              progressFill.style.width = pct + '%';
+              status.textContent = `認識中... ${pct}%`;
+            } else {
+              status.textContent = m.status || '処理中...';
+            }
+          }
+        });
+
+        progress.classList.remove('active');
+
+        const text = result.data.text.trim();
+        if (!text) {
+          showToast('テキストを認識できませんでした', 'warning');
+          return;
+        }
+
+        const lines = text.split('\n').filter(l => l.trim());
+
+        // 行ごとにグループ化
+        const rowGroups = {};
+        selectedCells.forEach(cell => {
+          if (!rowGroups[cell.row]) rowGroups[cell.row] = [];
+          rowGroups[cell.row].push(cell);
+        });
+
+        const sortedRows = Object.keys(rowGroups).map(Number).sort((a, b) => a - b);
+
+        sortedRows.forEach((rowIdx, lineIdx) => {
+          if (lineIdx < lines.length) {
+            const cells = rowGroups[rowIdx].sort((a, b) => a.col - b.col);
+            const lineText = lines[lineIdx].trim();
+            const parts = lineText.split(/\t+|\s{2,}/).filter(p => p.trim());
+
+            cells.forEach((cell, partIdx) => {
+              const col = detailColumns[cell.col];
+              if (!col.formula && detailRows[cell.row]) {
+                if (!detailRows[cell.row].original) detailRows[cell.row].original = {};
+                if (!detailRows[cell.row].ocrRegions) detailRows[cell.row].ocrRegions = {};
+                if (detailRows[cell.row].original[col.id] === undefined) {
+                  detailRows[cell.row].original[col.id] = detailRows[cell.row][col.id];
+                }
+                if (partIdx < parts.length) {
+                  detailRows[cell.row][col.id] = parts[partIdx].trim();
+                } else if (parts.length === 1 && partIdx === 0) {
+                  detailRows[cell.row][col.id] = lineText;
+                }
+                // OCR領域をセルに紐付けて保存
+                detailRows[cell.row].ocrRegions[col.id] = { ...ocrRegionInfo };
+                detailRows[cell.row].page = ocrRegionInfo.page;
+              }
+            });
+          }
+        });
+
+        saveUndoState();
+        renderDetailTable();
+        showToast(`${lines.length}行のテキストを認識しました`, 'success');
+
+      } catch (error) {
+        progress.classList.remove('active');
+        console.error('OCR Error:', error);
+        showToast('OCR処理でエラーが発生しました: ' + error.message, 'error');
+      }
+    }
+
+    // ==========================================
+    // ポップオーバー
+    // ==========================================
+    function togglePopover(id) {
+      const popover = document.getElementById(id);
+      document.querySelectorAll('.popover').forEach(p => {
+        if (p.id !== id) p.classList.remove('active');
+      });
+      popover.classList.toggle('active');
+    }
+
+    function initPartnerPopover() {
+      const popover = document.getElementById('partnerPopover');
+      partners.forEach(p => {
+        const item = document.createElement('div');
+        item.className = 'popover-item';
+        item.textContent = p;
+        item.onclick = () => {
+          document.getElementById('partnerInput').value = p;
+          popover.classList.remove('active');
+        };
+        popover.appendChild(item);
+      });
+    }
+
+    // カレンダー
+    let calendarDate = new Date();
+    function initCalendar() {
+      renderCalendar();
+    }
+
+    function renderCalendar() {
+      const cal = document.getElementById('calendar');
+      const year = calendarDate.getFullYear();
+      const month = calendarDate.getMonth();
+      const today = new Date();
+
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+      let html = `
+        <div class="calendar-header">
+          <button class="btn btn-secondary" onclick="changeMonth(-1)">◀</button>
+          <span>${year}年${month + 1}月</span>
+          <button class="btn btn-secondary" onclick="changeMonth(1)">▶</button>
+        </div>
+        <div class="calendar-grid">
+          <div style="color:#999">日</div><div style="color:#999">月</div><div style="color:#999">火</div>
+          <div style="color:#999">水</div><div style="color:#999">木</div><div style="color:#999">金</div><div style="color:#999">土</div>
+      `;
+
+      for (let i = 0; i < firstDay; i++) {
+        html += '<div class="calendar-day other-month"></div>';
+      }
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const isToday = year === today.getFullYear() && month === today.getMonth() && d === today.getDate();
+        html += `<div class="calendar-day${isToday ? ' today' : ''}" onclick="selectDate(${year},${month},${d})">${d}</div>`;
+      }
+
+      html += '</div>';
+      cal.innerHTML = html;
+    }
+
+    function changeMonth(delta) {
+      calendarDate.setMonth(calendarDate.getMonth() + delta);
+      renderCalendar();
+    }
+
+    function selectDate(y, m, d) {
+      const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      document.getElementById('dateInput').value = dateStr;
+      document.getElementById('calendarPopover').classList.remove('active');
+    }
+
+    // テンキー
+    function numpadInput(num) {
+      const input = document.getElementById('amountInput');
+      let val = input.value.replace(/[¥,]/g, '');
+      val += num;
+      input.value = '¥' + parseInt(val || 0).toLocaleString();
+    }
+
+    function numpadClear() {
+      document.getElementById('amountInput').value = '';
+    }
+
+    // カスタム属性
+    function addCustomAttr() {
+      const list = document.getElementById('customAttrList');
+      const row = document.createElement('div');
+      row.className = 'custom-attr-row';
+      row.innerHTML = `
+        <input type="text" class="form-input" placeholder="属性名" style="width:100px;">
+        <input type="text" class="form-input" placeholder="値">
+        <button class="btn btn-danger" onclick="this.parentElement.remove()">✕</button>
+      `;
+      list.appendChild(row);
+    }
+
+    // パネルタブ
+    function showPanelTab(tab) {
+      document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+      document.querySelector(`.panel-tab[onclick="showPanelTab('${tab}')"]`).classList.add('active');
+      document.getElementById('attrsPanel').style.display = tab === 'attrs' ? 'block' : 'none';
+      document.getElementById('detailsPanel').style.display = tab === 'details' ? 'block' : 'none';
+    }
+
+    // リサイザー
+    function setupResizers() {
+      setupResizer('listResizer', 'previewArea', 'width', 200, 600);
+      setupResizer('previewResizer', 'editPanel', 'width', 500, 1000, true);
+
+      // ウィンドウリサイズ時にPDFを再描画
+      window.addEventListener('resize', debounce(() => {
+        if (currentScreen === 'edit') {
+          renderPdfCanvas();
+        }
+      }, 200));
+    }
+
+    function debounce(func, wait) {
+      let timeout;
+      return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+      };
+    }
+
+    function setupResizer(resizerId, targetId, prop, min, max, rerenderPdf = false) {
+      const resizer = document.getElementById(resizerId);
+      const target = document.getElementById(targetId);
+      if (!resizer || !target) return;
+
+      let startX, startWidth;
+      let rafId = null;
+
+      resizer.addEventListener('mousedown', (e) => {
+        startX = e.clientX;
+        startWidth = target.offsetWidth;
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        document.addEventListener('mousemove', resize);
+        document.addEventListener('mouseup', stopResize);
+      });
+
+      function resize(e) {
+        const diff = startX - e.clientX;
+        const newWidth = Math.min(max, Math.max(min, startWidth + diff));
+        target.style.width = newWidth + 'px';
+
+        // PDFをリアルタイムでリサイズ（requestAnimationFrameで最適化）
+        if (rerenderPdf && currentScreen === 'edit') {
+          if (rafId) cancelAnimationFrame(rafId);
+          rafId = requestAnimationFrame(() => {
+            renderPdfCanvas();
+            rafId = null;
+          });
+        }
+      }
+
+      function stopResize() {
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        document.removeEventListener('mousemove', resize);
+        document.removeEventListener('mouseup', stopResize);
+        if (rafId) cancelAnimationFrame(rafId);
+        if (rerenderPdf && currentScreen === 'edit') {
+          renderPdfCanvas();
+        }
+      }
+    }
+
+    // ポップオーバーを外側クリックで閉じる
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.input-with-popup')) {
+        document.querySelectorAll('.popover').forEach(p => p.classList.remove('active'));
+      }
+    });
+  </script>
+</body>
+</html>
