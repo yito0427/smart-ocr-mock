@@ -1857,6 +1857,7 @@
                           oncontextmenu="showColumnMenu(event,${colIdx})">
                         <div class="cell-content${multilineClass}"
                              contenteditable="${!isFormula}"
+                             onfocus="handleCellFocus(event,${rowIdx},'${col.id}')"
                              oninput="handleCellInput(event,${rowIdx},'${col.id}')"
                              onblur="handleCellBlur(event,${rowIdx},'${col.id}')">${value}</div>
                       </td>`;
@@ -2148,6 +2149,13 @@
       calculateFormulas(row);
     }
 
+    // セル編集開始時に変更前の状態を保存
+    let _cellValueBeforeFocus = null;
+    function handleCellFocus(e, row, colId) {
+      _cellValueBeforeFocus = detailRows[row]?.[colId] || '';
+      saveUndoState();
+    }
+
     function handleCellBlur(e, row, colId) {
       if (!detailRows[row]) return;
       const html = e.target.innerHTML;
@@ -2165,7 +2173,12 @@
         detailRows[row].original[colId] = detailRows[row][colId];
       }
       detailRows[row][colId] = value;
-      saveUndoState();
+      // 値が変わっていなければundoスタックを戻す（無駄な履歴を残さない）
+      if (_cellValueBeforeFocus !== null && _cellValueBeforeFocus === value) {
+        undoStack.pop();
+        updateUndoRedoButtons();
+      }
+      _cellValueBeforeFocus = null;
       renderDetailTable();
     }
 
@@ -2469,11 +2482,15 @@
               pasteCells();
             }
           } else if (e.key === 'z') {
-            e.preventDefault();
-            undo();
+            if (!isEditingCell) {
+              e.preventDefault();
+              undo();
+            }
           } else if (e.key === 'y') {
-            e.preventDefault();
-            redo();
+            if (!isEditingCell) {
+              e.preventDefault();
+              redo();
+            }
           }
         } else if (e.key === 'Delete') {
           clearSelectedCells();
