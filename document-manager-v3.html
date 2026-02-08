@@ -2437,7 +2437,8 @@
         const cell = document.activeElement;
         if (!cell.classList.contains('cell-content')) return;
         // cut前のセル内容を保存して、どの行が切り取られたか特定する
-        const beforeLines = cell.textContent.split('\n');
+        // ※ textContentは<br>を無視するためinnerTextを使用
+        const beforeLines = cell.innerText.split('\n');
 
         // cut後のDOM更新を待ってから処理
         setTimeout(() => {
