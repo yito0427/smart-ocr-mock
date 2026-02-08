@@ -1777,7 +1777,7 @@
         bodyHtml += `<td class="row-number">${rowNum}</td>`;
         detailColumns.forEach((col, colIdx) => {
           const rawValue = row[col.id] || '';
-          const isMultiline = rawValue.includes('\n') && !row._forceSingleLine;
+          const isMultiline = rawValue.includes('\n');
           const value = isMultiline ? rawValue.replace(/\n/g, '<br>') : rawValue;
           const isModified = row.original?.[col.id] !== undefined && row.original[col.id] !== rawValue;
           const isFormula = col.formula;
@@ -2086,38 +2086,7 @@
     }
 
     function handleCellBlur(e, row, colId) {
-      if (!detailRows[row]) return; // 行が削除済みの場合はスキップ
-
-      // _forceSingleLine行かつユーザーが直接編集していないセルは
-      // HTMLからの再読み取りでデータが壊れるのでスキップ
-      if (detailRows[row]._forceSingleLine) {
-        // ユーザーが実際に編集したセル（フォーカスがあったセル）のみ更新
-        const html = e.target.innerHTML;
-        const value = html
-          .replace(/<div>/gi, '\n')
-          .replace(/<\/div>/gi, '')
-          .replace(/<br\s*\/?>/gi, '\n')
-          .replace(/&nbsp;/gi, ' ')
-          .replace(/&lt;/gi, '<')
-          .replace(/&gt;/gi, '>')
-          .replace(/&amp;/gi, '&')
-          .trim();
-        // 値が変わっていない場合はデータを上書きしない
-        if (value === detailRows[row][colId] || value === detailRows[row][colId]?.replace(/\n/g, ' ')) {
-          renderDetailTable();
-          return;
-        }
-        if (!detailRows[row].original) detailRows[row].original = {};
-        if (detailRows[row].original[colId] === undefined) {
-          detailRows[row].original[colId] = detailRows[row][colId];
-        }
-        detailRows[row][colId] = value;
-        saveUndoState();
-        renderDetailTable();
-        return;
-      }
-
-      // 通常行: blur時にinnerHTMLからデータを再取得
+      if (!detailRows[row]) return;
       const html = e.target.innerHTML;
       const value = html
         .replace(/<div>/gi, '\n')
@@ -2138,8 +2107,9 @@
     }
 
     function calculateFormulas(row) {
-      // _forceSingleLine行はマルチライン値のparse結果が不正になるので再計算しない
-      if (detailRows[row]?._forceSingleLine) return;
+      // マルチライン値を含む行はparseFloat()が先頭値のみ取得するため再計算しない
+      const hasMultilineValue = detailColumns.some(c => (detailRows[row]?.[c.id] || '').includes('\n'));
+      if (hasMultilineValue) return;
       detailColumns.forEach(col => {
         if (col.formula) {
           let formula = col.formula;
@@ -2495,12 +2465,7 @@
           }
           detailRows[rowIdx][colId] = afterValue;
 
-          // セルが1行になったら、行全体を強制的に1行表示にする（データは変えない）
-          if (!afterValue.includes('\n')) {
-            detailRows[rowIdx]._forceSingleLine = true;
-          }
-
-          // 再描画して行の高さを更新
+          // 再描画して表示を更新
           saveUndoState();
           renderDetailTable();
         }, 0);
