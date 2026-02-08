@@ -1663,6 +1663,68 @@
       drawCanvas.addEventListener('mouseleave', () => {
         isDrawing = false;
       });
+
+      // selectモード時：PDFの明細行クリックで対応する明細テーブル行を選択
+      drawCanvas.addEventListener('click', (e) => {
+        if (isOcrMode || currentTool !== 'select') return;
+        handlePdfTableClick(e);
+      });
+    }
+
+    // PDFの明細テーブル行クリック → 明細テーブルの対応行を選択・スクロール
+    function handlePdfTableClick(e) {
+      const canvas = document.getElementById('pdfCanvas');
+      const rect = e.target.getBoundingClientRect();
+      const canvasX = e.clientX - rect.left;
+      const canvasY = e.clientY - rect.top;
+
+      // キャンバス座標からPDF座標に変換
+      const baseWidth = 595;
+      const actualZoom = canvas.width / baseWidth;
+      const pdfX = canvasX / actualZoom;
+      const pdfY = canvasY / actualZoom;
+
+      // テーブル範囲外チェック（x: 50〜550）
+      if (pdfX < 50 || pdfX > 550) return;
+
+      // クリック位置からPDF行インデックスを計算
+      const tableStartY = PDF_TABLE.getStartY(currentPage);
+      const dataStartY = tableStartY + 25; // ヘッダー行の後
+      if (pdfY < dataStartY) return;
+
+      const pdfRowIndex = Math.floor((pdfY - dataStartY) / PDF_TABLE.rowHeight);
+      if (pdfRowIndex < 0) return;
+
+      // クリック位置からカラムを特定
+      let clickedColId = null;
+      for (const [colId, colPos] of Object.entries(PDF_TABLE.cols)) {
+        if (pdfX >= colPos.x && pdfX < colPos.x + colPos.w) {
+          clickedColId = colId;
+          break;
+        }
+      }
+      if (!clickedColId) return;
+
+      // 対応するdetailRows行を検索（pageとpdfRowIndexで一致）
+      const detailRowIdx = detailRows.findIndex(r =>
+        !r.pageBreak && r.page === currentPage && r.pdfRowIndex === pdfRowIndex
+      );
+      if (detailRowIdx === -1) return;
+
+      // カラムインデックスを取得
+      const colIdx = detailColumns.findIndex(c => c.id === clickedColId);
+      if (colIdx === -1) return;
+
+      // 明細テーブルの該当セルを選択
+      selectedCells = [{ row: detailRowIdx, col: colIdx }];
+      selectionAnchor = { row: detailRowIdx, col: colIdx };
+      renderDetailTable();
+
+      // PDFハイライト表示
+      highlightPdfCell(detailRowIdx, colIdx);
+
+      // 明細テーブルをスクロールして選択セルを表示
+      setTimeout(() => scrollDetailTableToCell(detailRowIdx, colIdx), 0);
     }
 
     function startDrawing(e) {
