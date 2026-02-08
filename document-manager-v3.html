@@ -741,8 +741,7 @@
     }
 
     .detail-table td.formula .cell-content {
-      background: var(--bg-light);
-      color: var(--text-secondary);
+      background: #fff;
     }
 
     /* セル選択情報バー */
@@ -2634,9 +2633,21 @@
         newRow = Math.min(detailRows.length - 1, newRow + 1);
       }
 
-      // Shift+→で次ページへ
-      if (e.shiftKey && e.key === 'ArrowRight') {
-        nextPage();
+      // Shift+→で次ページへ、Shift+←で前ページへ（明細テーブルの左上セルを選択）
+      if (e.shiftKey && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+        if (e.key === 'ArrowRight') {
+          nextPage();
+        } else {
+          prevPage();
+        }
+        const firstRowIdx = detailRows.findIndex(r => !r.pageBreak && r.page === currentPage);
+        if (firstRowIdx !== -1) {
+          selectedCells = [{ row: firstRowIdx, col: 0 }];
+          selectionAnchor = { row: firstRowIdx, col: 0 };
+          renderDetailTable();
+          highlightPdfCell(firstRowIdx, 0);
+          setTimeout(() => scrollDetailTableToCell(firstRowIdx, 0), 0);
+        }
         return;
       }
 
