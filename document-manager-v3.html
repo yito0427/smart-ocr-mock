@@ -2086,7 +2086,38 @@
     }
 
     function handleCellBlur(e, row, colId) {
-      // blur時にもinnerHTMLからデータを再取得して確実に同期
+      if (!detailRows[row]) return; // 行が削除済みの場合はスキップ
+
+      // _forceSingleLine行かつユーザーが直接編集していないセルは
+      // HTMLからの再読み取りでデータが壊れるのでスキップ
+      if (detailRows[row]._forceSingleLine) {
+        // ユーザーが実際に編集したセル（フォーカスがあったセル）のみ更新
+        const html = e.target.innerHTML;
+        const value = html
+          .replace(/<div>/gi, '\n')
+          .replace(/<\/div>/gi, '')
+          .replace(/<br\s*\/?>/gi, '\n')
+          .replace(/&nbsp;/gi, ' ')
+          .replace(/&lt;/gi, '<')
+          .replace(/&gt;/gi, '>')
+          .replace(/&amp;/gi, '&')
+          .trim();
+        // 値が変わっていない場合はデータを上書きしない
+        if (value === detailRows[row][colId] || value === detailRows[row][colId]?.replace(/\n/g, ' ')) {
+          renderDetailTable();
+          return;
+        }
+        if (!detailRows[row].original) detailRows[row].original = {};
+        if (detailRows[row].original[colId] === undefined) {
+          detailRows[row].original[colId] = detailRows[row][colId];
+        }
+        detailRows[row][colId] = value;
+        saveUndoState();
+        renderDetailTable();
+        return;
+      }
+
+      // 通常行: blur時にinnerHTMLからデータを再取得
       const html = e.target.innerHTML;
       const value = html
         .replace(/<div>/gi, '\n')
@@ -2097,7 +2128,6 @@
         .replace(/&gt;/gi, '>')
         .replace(/&amp;/gi, '&')
         .trim();
-      if (!detailRows[row]) return; // 行が削除済みの場合はスキップ
       if (!detailRows[row].original) detailRows[row].original = {};
       if (detailRows[row].original[colId] === undefined) {
         detailRows[row].original[colId] = detailRows[row][colId];
@@ -2108,6 +2138,8 @@
     }
 
     function calculateFormulas(row) {
+      // _forceSingleLine行はマルチライン値のparse結果が不正になるので再計算しない
+      if (detailRows[row]?._forceSingleLine) return;
       detailColumns.forEach(col => {
         if (col.formula) {
           let formula = col.formula;
